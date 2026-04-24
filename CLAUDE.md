@@ -1,18 +1,36 @@
-# V4 Modifications — meshtastic-firmware
+# meshtastic-firmware (v4 fork)
 
-> This file tracks all intentional changes made on the `v4` branch relative to
-> upstream `meshtastic/firmware`. When merging a new upstream release, consult
-> this list to understand which conflicts are expected vs accidental.
+> This is a fork of `meshtastic/firmware` on the `v4` branch.
+> When merging upstream releases, consult the V4 Modifications section
+> to understand which conflicts are expected vs accidental.
 
 ## Upstream Base
 
 - **Tag:** v2.7.22.96dd647
 - **Commit:** 01bd4cfb73bb7bc20ea4cf08c36d66c45b4bea35
 - **Channel:** prerelease (alpha)
+- **Upstream repo:** meshtastic/firmware
+- **Fork repo:** ncwn/meshtastic-firmware
 
-## Changed Files
+## Build
 
-<!-- Format:
+- PlatformIO-based — see `platformio.ini` for targets
+- Build: `pio run -e <target>`
+- Flash: `pio run -e <target> -t upload`
+- Monitor: `pio device monitor`
+
+## Rules
+
+- Always merge upstream, **never rebase v4**
+- Update the V4 Modifications section below when changing files
+- Do NOT modify protobufs without checking the Dependencies section
+- Feature work goes on branches off v4, merged back to v4
+- After pushing v4, update the wrapper repo submodule SHA
+
+## V4 Modifications
+
+<!-- When you modify a file, add an entry here:
+
 ### path/to/file.cpp
 - **What:** Brief description of the change
 - **Why:** Reason this modification is needed for the v4 project
@@ -21,13 +39,13 @@
 
 _No modifications yet — v4 branch starts clean from upstream base._
 
-## New Files
+### New Files
 
 <!-- Files added that don't exist in upstream -->
 
 _None yet._
 
-## Deleted Files
+### Deleted Files
 
 <!-- Upstream files removed intentionally -->
 

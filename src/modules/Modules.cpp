@@ -107,6 +107,12 @@
 #if defined(HAS_HARDWARE_WATCHDOG)
 #include "watchdog/watchdogThread.h"
 #endif
+
+// SELFCIUS integration hook. Compiles out for stock Meshtastic builds.
+#if defined(SELFCIUS_OFFICER) || defined(SELFCIUS_RELAY_MESH)
+#include "selfcius_init.h"
+#endif
+
 /**
  * Create module instances here.  If you are adding a new module, you must 'new' it here (or somewhere else)
  */
@@ -188,6 +194,11 @@ void setupModules()
 #endif
     // Example: Put your module here
     // new ReplyModule();
+#if defined(SELFCIUS_OFFICER)
+    selfcius::initOfficerModules();
+#elif defined(SELFCIUS_RELAY_MESH)
+    selfcius::initRelayMeshModules();
+#endif
 #if HAS_SCREEN && !MESHTASTIC_EXCLUDE_CANNEDMESSAGES
     if (config.display.displaymode != meshtastic_Config_DisplayConfig_DisplayMode_COLOR) {
         cannedMessageModule = new CannedMessageModule();

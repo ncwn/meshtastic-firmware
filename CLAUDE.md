@@ -37,7 +37,25 @@
 - **Conflict risk:** Low / Medium / High when merging upstream
 -->
 
-_No modifications yet — v4 branch starts clean from upstream base._
+### .gitignore
+- **What:** Added ignores for the SELFCIUS generated PlatformIO overlay symlinks: `/platformio_override.ini`, `/variants/selfcius/`, and `/src/selfcius/`
+- **Why:** The wrapper repo creates these symlinks from `build/setup.sh` so SELFCIUS build environments and sources can load without committing wrapper-local paths into the public firmware fork
+- **Conflict risk:** Low - append-only ignore rules
+
+### src/modules/Modules.cpp
+- **What:** Added a conditional SELFCIUS include and ifdef-guarded calls to `selfcius::initOfficerModules()` / `selfcius::initRelayMeshModules()` inside `setupModules()`
+- **Why:** Provides the single firmware entry point for wrapper-owned SELFCIUS modules. Stock builds compile these lines out because `SELFCIUS_OFFICER` and `SELFCIUS_RELAY_MESH` are not defined.
+- **Conflict risk:** Low - insertion is in the existing "Put your module here" area before `RoutingModule`, which must remain last
+
+### src/modules/AdminModule.cpp
+- **What:** Guarded the OTA admin request path so it only uses `MeshtasticOTA` when WiFi is enabled, and returns a warning instead of rebooting on unsupported builds
+- **Why:** SELFCIUS trims WiFi for ESP32 officer/relay builds. Without this guard, `AdminModule` references OTA symbols that are not compiled in and breaks the build.
+- **Conflict risk:** Medium - upstream OTA/admin changes could touch the same switch case
+
+### platformio.ini
+- **What:** Excluded `selfcius/` from the default Arduino `build_src_filter`
+- **Why:** The wrapper repo exposes SELFCIUS sources into `src/selfcius` via symlink for custom environments. Stock Meshtastic builds must ignore that tree unless a SELFCIUS-specific environment explicitly opts back in.
+- **Conflict risk:** Medium - upstream build filter changes in `platformio.ini` could overlap
 
 ### New Files
 

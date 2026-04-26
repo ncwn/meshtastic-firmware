@@ -100,6 +100,7 @@ SELFCIUS code starts using a new internal surface.
 | Meshtastic-maintained local position state | `localPosition` and NodeDB helpers | `mesh/NodeDB.h` | Medium |
 | Relay hop metrics | `meshtastic_MeshPacket::hop_start`, `hop_limit` | generated mesh packet types | Low |
 | Wrapper logging and error reporting | `LOG_INFO`, `LOG_DEBUG`, `LOG_WARN`, `LOG_ERROR` | Meshtastic logging macros | Low |
+| Transitive include from every SELFCIUS .cpp | `configuration.h` | `configuration.h` | Low |
 | Planned DTN filesystem abstraction | `FSCom` | `FSCommon.h` | Low |
 | Planned DTN filesystem locking | `spiLock` | `SPILock.h` | Medium |
 

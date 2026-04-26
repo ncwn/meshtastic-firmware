@@ -57,6 +57,11 @@
 - **Why:** The wrapper repo exposes SELFCIUS sources into `src/selfcius` via symlink for custom environments. Stock Meshtastic builds must ignore that tree unless a SELFCIUS-specific environment explicitly opts back in.
 - **Conflict risk:** Medium - upstream build filter changes in `platformio.ini` could overlap
 
+### CLAUDE.md
+- **What:** Added a SELFCIUS dependency tracking section listing the Meshtastic internal APIs the current overlay depends on
+- **Why:** Upstream merges need one place to check which internals are part of the active SELFCIUS fork surface before resolving conflicts or refactors
+- **Conflict risk:** Low - documentation-only change in the fork guidance file
+
 ### New Files
 
 <!-- Files added that don't exist in upstream -->
@@ -77,3 +82,25 @@ _None yet._
 - **Future trigger:** If v4 later needs custom mesh messages, port numbers, generated API fields, or shared protocol definitions that cannot fit cleanly in existing payloads, promote protobufs to a tracked v4 fork before landing the protocol change.
 - **Escalation path:** Execute the "Forking protobufs later" path in the wrapper repo, update `upstream-versions.json`, document app generation impact, and record all protobuf edits in this file.
 - **Action on upstream merge:** Accept upstream's protobufs pointer as-is unless a tracked v4 protobuf fork has been created.
+
+## SELFCIUS Dependency Tracking
+
+SELFCIUS overlay code currently depends on these Meshtastic internal APIs.
+Check this table during upstream merges and update it whenever wrapper-owned
+SELFCIUS code starts using a new internal surface.
+
+| SELFCIUS usage | Meshtastic API | File | Merge risk |
+|----------------|----------------|------|------------|
+| Officer private-port receive path | `SinglePortModule` | `mesh/SinglePortModule.h` | Low |
+| Relay packet observation | `MeshModule` and `isPromiscuous` | `mesh/MeshModule.h` | Low |
+| Periodic SELFCIUS worker threads | `concurrency::OSThread` | `concurrency/OSThread.h` | Low |
+| Future DTN packet allocation | `router->allocForSending()` | `mesh/Router.h` | Low |
+| Future DTN packet send | `service->sendToMesh()` | `mesh/MeshService.h` | Low |
+| Officer GPS read path | `gps`, `gps->p`, `gps->hasLock()`, `gps->newStatus` | `gps/GPS.h` | Medium |
+| Meshtastic-maintained local position state | `localPosition` and NodeDB helpers | `mesh/NodeDB.h` | Medium |
+| Relay hop metrics | `meshtastic_MeshPacket::hop_start`, `hop_limit` | generated mesh packet types | Low |
+| Wrapper logging and error reporting | `LOG_INFO`, `LOG_DEBUG`, `LOG_WARN`, `LOG_ERROR` | Meshtastic logging macros | Low |
+| Planned DTN filesystem abstraction | `FSCom` | `FSCommon.h` | Low |
+| Planned DTN filesystem locking | `spiLock` | `SPILock.h` | Medium |
+
+**Last verified:** 2026-04-26 against `v2.7.22.96dd647-5-g5ca3bdae7`

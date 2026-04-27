@@ -64,6 +64,9 @@
 - **What:** Updated SELFCIUS dependency tracking for Phase 1C GPS timestamp/RTC checks and relay receive/store surfaces
 - **Why:** Phase 1C now uses RTC-relative GPS timestamp checks and relay-local DTN storage paths that need explicit upstream merge checks
 - **Conflict risk:** Low - documentation-only update to fork guidance
+- **What:** Updated SELFCIUS dependency tracking for Phase 1C review-fix surfaces: GPS last-fix age, receive-queue mutexes, and relay response suppression
+- **Why:** Review fixes depend on Meshtastic `GPSStatus`, FreeRTOS mutex helpers, and `MeshModule::ignoreRequest`, so upstream merges need those surfaces called out explicitly
+- **Conflict risk:** Low - documentation-only update to fork guidance
 
 ### New Files
 
@@ -95,10 +98,11 @@ SELFCIUS code starts using a new internal surface.
 | SELFCIUS usage | Meshtastic API | File | Merge risk |
 |----------------|----------------|------|------------|
 | Officer private-port receive/send path | `SinglePortModule`, `allocDataPacket()` | `mesh/SinglePortModule.h` | Low |
-| Relay packet observation and private-port receive/store path | `MeshModule`, `isPromiscuous`, decoded payload metadata from `meshtastic_MeshPacket` | `mesh/MeshModule.h`, generated mesh packet types | Low |
+| Relay packet observation and private-port receive/store path | `MeshModule`, `isPromiscuous`, `ignoreRequest`, decoded payload metadata from `meshtastic_MeshPacket` | `mesh/MeshModule.h`, generated mesh packet types | Medium |
 | Periodic SELFCIUS worker threads | `concurrency::OSThread` | `concurrency/OSThread.h` | Low |
+| Officer and relay callback receive queue locking | `freertosinc.h`, `StaticSemaphore_t`, `xSemaphoreCreateMutexStatic()`, `xSemaphoreTake()`, `xSemaphoreGive()` | `freertosinc.h` | Medium |
 | DTN packet send submission | `service->sendToMesh()` | `mesh/MeshService.h` | Low |
-| Officer GPS read path | `gps`, `gps->p`, `gps->hasLock()`, `getValidTime(RTCQualityDevice)` | `gps/GPS.h`, `gps/RTC.h` | Medium |
+| Officer GPS read path | `gps`, `gps->p`, `gps->hasLock()`, `gpsStatus`, `GPSStatus::getLastFixMillis()`, `getValidTime(RTCQualityDevice)` | `gps/GPS.h`, `GPSStatus.h`, `gps/RTC.h` | Medium |
 | Meshtastic-maintained local position state | `localPosition` and NodeDB helpers | `mesh/NodeDB.h` | Medium |
 | Relay hop metrics | `meshtastic_MeshPacket::hop_start`, `hop_limit` | generated mesh packet types | Low |
 | Officer SOS button observation | `inputBroker`, `InputEvent`, `INPUT_BROKER_USER_PRESS`, `CallbackObserver` | `input/InputBroker.h` | Medium |
@@ -110,4 +114,4 @@ SELFCIUS code starts using a new internal surface.
 | Officer and relay DTN filesystem locking | `spiLock` | `SPILock.h` | Medium |
 | SOS scheduler jitter source | `esp_random()` | ESP-IDF random API | Low |
 
-**Last verified:** 2026-04-27 against `v2.7.22.96dd647-8-g59883c089` during Phase 1C hardening implementation
+**Last verified:** 2026-04-27 against `v2.7.22.96dd647-9-g9fecb59a5` during Phase 1C review-fix software verification

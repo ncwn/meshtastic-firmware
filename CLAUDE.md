@@ -91,17 +91,20 @@ SELFCIUS code starts using a new internal surface.
 
 | SELFCIUS usage | Meshtastic API | File | Merge risk |
 |----------------|----------------|------|------------|
-| Officer private-port receive path | `SinglePortModule` | `mesh/SinglePortModule.h` | Low |
+| Officer private-port receive/send path | `SinglePortModule`, `allocDataPacket()` | `mesh/SinglePortModule.h` | Low |
 | Relay packet observation | `MeshModule` and `isPromiscuous` | `mesh/MeshModule.h` | Low |
 | Periodic SELFCIUS worker threads | `concurrency::OSThread` | `concurrency/OSThread.h` | Low |
-| Future DTN packet allocation | `router->allocForSending()` | `mesh/Router.h` | Low |
-| Future DTN packet send | `service->sendToMesh()` | `mesh/MeshService.h` | Low |
+| DTN packet send submission | `service->sendToMesh()` | `mesh/MeshService.h` | Low |
 | Officer GPS read path | `gps`, `gps->p`, `gps->hasLock()`, `gps->newStatus` | `gps/GPS.h` | Medium |
 | Meshtastic-maintained local position state | `localPosition` and NodeDB helpers | `mesh/NodeDB.h` | Medium |
 | Relay hop metrics | `meshtastic_MeshPacket::hop_start`, `hop_limit` | generated mesh packet types | Low |
+| Officer SOS button observation | `inputBroker`, `InputEvent`, `INPUT_BROKER_USER_PRESS`, `CallbackObserver` | `input/InputBroker.h` | Medium |
+| Officer OLED status/alert pages | `graphics::Screen`, `UIFrameEvent`, `OLEDDisplay`, `OLEDDisplayUi`, `ScreenFonts`, `screen->startAlert()`, `screen->endAlert()`, `screen->showSimpleBanner()` | `graphics/Screen.h`, OLED display headers | Medium |
+| SELFCIUS scheduler wake-up | `concurrency::mainDelay.interrupt()` | `concurrency/Periodic.h` | Low |
 | Wrapper logging and error reporting | `LOG_INFO`, `LOG_DEBUG`, `LOG_WARN`, `LOG_ERROR` | Meshtastic logging macros | Low |
 | Transitive include from every SELFCIUS .cpp | `configuration.h` | `configuration.h` | Low |
-| Planned DTN filesystem abstraction | `FSCom` | `FSCommon.h` | Low |
-| Planned DTN filesystem locking | `spiLock` | `SPILock.h` | Medium |
+| DTN filesystem abstraction | `FSCom` | `FSCommon.h` | Low |
+| DTN filesystem locking | `spiLock` | `SPILock.h` | Medium |
+| SOS scheduler jitter source | `esp_random()` | ESP-IDF random API | Low |
 
-**Last verified:** 2026-04-26 against `v2.7.22.96dd647-5-g5ca3bdae7`
+**Last verified:** 2026-04-27 against `v2.7.22.96dd647-7-g119839956` after Phase 1A/1B bench gate

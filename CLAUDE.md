@@ -73,6 +73,9 @@
 - **What:** Updated Phase 1C verification tracking after the provenance hardware reflash
 - **Why:** Relay and officer bench nodes were reflashed from the latest Phase 1C branch tip, so the fork guidance must no longer describe the current bench flash as the older `9fecb59a5` build
 - **Conflict risk:** Low - documentation-only update to fork guidance
+- **What:** Added Phase 1C compatibility migration from legacy `SDTN` stored-record frames to current `SDT2` frames with ingress provenance
+- **Why:** Phase 1C extended persisted DTN records with ingress node IDs; legacy bench records must migrate without being mistaken for corrupt segments or silently removed
+- **Conflict risk:** Low - wrapper-owned SELFCIUS storage codec/backend only
 
 ### New Files
 
@@ -120,5 +123,5 @@ SELFCIUS code starts using a new internal surface.
 | Officer and relay DTN filesystem locking | `spiLock` | `SPILock.h` | Medium |
 | SOS scheduler jitter source | `esp_random()` | ESP-IDF random API | Low |
 
-**Last software verified:** 2026-04-27 against `cfb828895` / firmware `2.7.22.cfb8288` during Phase 1C provenance review-fix verification.
-**Last hardware verified:** 2026-04-27 against `ab38b2593` / firmware `2.7.22.ab38b25` during the Phase 1C provenance hardware reflash and relay observe/store bench proof.
+**Last software verified:** 2026-04-28 against `daf00521e` / firmware `2.7.22.daf0052` during Phase 1C finding-fix verification.
+**Last hardware verified:** 2026-04-28 against `daf00521e` / firmware `2.7.22.daf0052` for relay observe/store bench proof; officers remained on prior Phase 1C firmware during the final relay-only finding-fix pass.

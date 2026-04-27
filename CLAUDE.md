@@ -61,6 +61,9 @@
 - **What:** Added a SELFCIUS dependency tracking section listing the Meshtastic internal APIs the current overlay depends on
 - **Why:** Upstream merges need one place to check which internals are part of the active SELFCIUS fork surface before resolving conflicts or refactors
 - **Conflict risk:** Low - documentation-only change in the fork guidance file
+- **What:** Updated SELFCIUS dependency tracking for Phase 1C GPS timestamp/RTC checks and relay receive/store surfaces
+- **Why:** Phase 1C now uses RTC-relative GPS timestamp checks and relay-local DTN storage paths that need explicit upstream merge checks
+- **Conflict risk:** Low - documentation-only update to fork guidance
 
 ### New Files
 
@@ -92,10 +95,10 @@ SELFCIUS code starts using a new internal surface.
 | SELFCIUS usage | Meshtastic API | File | Merge risk |
 |----------------|----------------|------|------------|
 | Officer private-port receive/send path | `SinglePortModule`, `allocDataPacket()` | `mesh/SinglePortModule.h` | Low |
-| Relay packet observation | `MeshModule` and `isPromiscuous` | `mesh/MeshModule.h` | Low |
+| Relay packet observation and private-port receive/store path | `MeshModule`, `isPromiscuous`, decoded payload metadata from `meshtastic_MeshPacket` | `mesh/MeshModule.h`, generated mesh packet types | Low |
 | Periodic SELFCIUS worker threads | `concurrency::OSThread` | `concurrency/OSThread.h` | Low |
 | DTN packet send submission | `service->sendToMesh()` | `mesh/MeshService.h` | Low |
-| Officer GPS read path | `gps`, `gps->p`, `gps->hasLock()`, `gps->newStatus` | `gps/GPS.h` | Medium |
+| Officer GPS read path | `gps`, `gps->p`, `gps->hasLock()`, `getValidTime(RTCQualityDevice)` | `gps/GPS.h`, `gps/RTC.h` | Medium |
 | Meshtastic-maintained local position state | `localPosition` and NodeDB helpers | `mesh/NodeDB.h` | Medium |
 | Relay hop metrics | `meshtastic_MeshPacket::hop_start`, `hop_limit` | generated mesh packet types | Low |
 | Officer SOS button observation | `inputBroker`, `InputEvent`, `INPUT_BROKER_USER_PRESS`, `CallbackObserver` | `input/InputBroker.h` | Medium |
@@ -103,8 +106,8 @@ SELFCIUS code starts using a new internal surface.
 | SELFCIUS scheduler wake-up | `concurrency::mainDelay.interrupt()` | `concurrency/Periodic.h` | Low |
 | Wrapper logging and error reporting | `LOG_INFO`, `LOG_DEBUG`, `LOG_WARN`, `LOG_ERROR` | Meshtastic logging macros | Low |
 | Transitive include from every SELFCIUS .cpp | `configuration.h` | `configuration.h` | Low |
-| DTN filesystem abstraction | `FSCom` | `FSCommon.h` | Low |
-| DTN filesystem locking | `spiLock` | `SPILock.h` | Medium |
+| Officer and relay DTN filesystem abstraction | `FSCom` | `FSCommon.h` | Low |
+| Officer and relay DTN filesystem locking | `spiLock` | `SPILock.h` | Medium |
 | SOS scheduler jitter source | `esp_random()` | ESP-IDF random API | Low |
 
-**Last verified:** 2026-04-27 against `v2.7.22.96dd647-7-g119839956` after Phase 1A/1B bench gate
+**Last verified:** 2026-04-27 against `v2.7.22.96dd647-8-g59883c089` during Phase 1C hardening implementation

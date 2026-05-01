@@ -77,6 +77,46 @@
 - **Why:** Phase 1C extended persisted DTN records with ingress node IDs; legacy bench records must migrate without being mistaken for corrupt segments or silently removed
 - **Conflict risk:** Low - wrapper-owned SELFCIUS storage codec/backend only
 
+### src/selfcius/common/dtn/selfcius_dtn_storage.h
+- **What:** Added a backend append-reason hook so DTN callers can distinguish storage failure modes beyond a bare `-1`
+- **Why:** Hardware validation on Officer D218 surfaced `store_result=5` without enough context to tell full-storage from LittleFS write/open failures
+- **Conflict risk:** Low - wrapper-owned DTN backend interface used only by SELFCIUS storage implementations
+
+### src/selfcius/common/dtn/selfcius_dtn_store.h
+- **What:** Exposed the last DTN backend append result through `DtnStore`
+- **Why:** Officer-side logs need the backend failure reason that triggered `BackendFailure` during live bench validation
+- **Conflict risk:** Low - wrapper-owned DTN store surface
+
+### src/selfcius/common/dtn/selfcius_dtn_store.cpp
+- **What:** Captured backend append failure reasons when `storage.append()` fails
+- **Why:** Preserves the true LittleFS failure boundary for officer diagnostics instead of collapsing every append failure into the same opaque result
+- **Conflict risk:** Low - wrapper-owned DTN store logic
+
+### src/selfcius/common/dtn/selfcius_littlefs_storage.h
+- **What:** Added typed LittleFS append failure reasons
+- **Why:** Officer validation needs to tell apart full-storage, no-free-slot, encode, open, and short-write failures without destructive probing
+- **Conflict risk:** Low - wrapper-owned LittleFS backend surface
+
+### src/selfcius/common/dtn/selfcius_littlefs_storage.cpp
+- **What:** Returned structured LittleFS append/write failure reasons instead of a single generic failure path
+- **Why:** Makes Officer D218 `store_result=5` diagnostics actionable during bench validation and preserves non-destructive debugging
+- **Conflict risk:** Low - wrapper-owned LittleFS backend implementation
+
+### src/selfcius/common/dtn/selfcius_memory_storage.h
+- **What:** Added last-append-result tracking to the native in-memory DTN backend
+- **Why:** Keeps host-native tests aligned with the new DTN backend failure introspection API
+- **Conflict risk:** Low - wrapper-owned native test backend
+
+### src/selfcius/common/dtn/selfcius_memory_storage.cpp
+- **What:** Recorded the last append result in the native in-memory DTN backend
+- **Why:** Supports red-green tests for DTN backend failure provenance
+- **Conflict risk:** Low - wrapper-owned native test backend
+
+### src/selfcius/officer/selfcius_officer_module.cpp
+- **What:** Expanded officer DTN store failure logs to include symbolic store-result names, LittleFS append failure reasons, and current stored-record count
+- **Why:** Hardware validation on Officer D218 showed `store_result=5` but not the concrete storage boundary that caused it
+- **Conflict risk:** Low - wrapper-owned officer overlay diagnostics
+
 ### New Files
 
 <!-- Files added that don't exist in upstream -->

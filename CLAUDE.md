@@ -19,6 +19,22 @@
 - Flash: `pio run -e <target> -t upload`
 - Monitor: `pio device monitor`
 
+## SELFCIUS Bench Identity
+
+- USB serial paths are not durable node identity. Always run the wrapper scanner before flashing or resetting: `../scripts/selfcius-scan-nodes.sh` from this submodule, or `./scripts/selfcius-scan-nodes.sh` from the wrapper root.
+- Use explicit `--port` values for flash/reset commands, but choose that port from fresh scanner output using node ID, MAC, role, and `pioEnv`; do not rely on `/dev/cu.usbserial*` names.
+- Known bench identities:
+
+| Node ID | Role | Firmware Env | Notes |
+|---------|------|--------------|-------|
+| `!9ea202b4` | ROUTER | `selfcius-relay-mesh` | Board A relay |
+| `!9ea3d218` | CLIENT | `selfcius-officer` | Officer D218 |
+| `!db528154` | CLIENT | `selfcius-officer` | Officer 8154 |
+| non-Meshtastic | — | `selfcius-relay-lorawan` | Board B standalone ESP32-S3; identify by serial boot banner `SELFCIUS Board B — v0.2.0` |
+
+- Officer GPS provisioning requires Meshtastic config readback: `position.rx_gpio=5`, `position.tx_gpio=4`, and `position.gps_mode=ENABLED`.
+- Never remove an SX1262 antenna while transmitting; verify LoRaWAN failure recovery without antenna-disconnect tests.
+
 ## Rules
 
 - Always merge upstream, **never rebase v4**
@@ -26,6 +42,7 @@
 - Do NOT modify protobufs without checking the Dependencies section
 - Feature work goes on branches off v4, merged back to v4
 - After pushing v4, update the wrapper repo submodule SHA
+- Treat SELFCIUS evidence as bench validation unless a gate document explicitly says field validation
 
 ## V4 Modifications
 
@@ -52,12 +69,20 @@
 - **Why:** SELFCIUS trims WiFi for ESP32 officer/relay builds. Without this guard, `AdminModule` references OTA symbols that are not compiled in and breaks the build.
 - **Conflict risk:** Medium - upstream OTA/admin changes could touch the same switch case
 
+### src/mesh/PhoneAPI.cpp
+- **What:** Skipped the recursive filesystem manifest scan for `SPECIAL_NONCE_ONLY_NODES` BLE config requests.
+- **Why:** SELFCIUS officers can have many persisted `/selfcius/rec/*.dat` custody files; rebuilding the file manifest for node-info-only requests wastes heap and caused Officer 8154 to abort in `getFiles()` during BLE config sync.
+- **Conflict risk:** Medium - upstream phone API/config-sync changes may touch the same startup state machine.
+
 ### platformio.ini
 - **What:** Excluded `selfcius/` from the default Arduino `build_src_filter`
 - **Why:** The wrapper repo exposes SELFCIUS sources into `src/selfcius` via symlink for custom environments. Stock Meshtastic builds must ignore that tree unless a SELFCIUS-specific environment explicitly opts back in.
 - **Conflict risk:** Medium - upstream build filter changes in `platformio.ini` could overlap
 
 ### CLAUDE.md
+- **What:** Updated guidance with durable SELFCIUS bench node identity, scanner-first flash/reset rules, GPS provisioning readback requirements, and bench-validation wording
+- **Why:** USB serial device paths change between sessions; future agents must map hardware by node ID/MAC/role/`pioEnv` and avoid overstating bench evidence as field readiness
+- **Conflict risk:** Low - documentation-only update to fork guidance
 - **What:** Added a SELFCIUS dependency tracking section listing the Meshtastic internal APIs the current overlay depends on
 - **Why:** Upstream merges need one place to check which internals are part of the active SELFCIUS fork surface before resolving conflicts or refactors
 - **Conflict risk:** Low - documentation-only change in the fork guidance file
@@ -116,6 +141,11 @@
 - **What:** Expanded officer DTN store failure logs to include symbolic store-result names, LittleFS append failure reasons, and current stored-record count
 - **Why:** Hardware validation on Officer D218 showed `store_result=5` but not the concrete storage boundary that caused it
 - **Conflict risk:** Low - wrapper-owned officer overlay diagnostics
+
+### src/selfcius/relay_lorawan/lorawan_driver.cpp
+- **What:** Normalized the RadioLib ABP session RX timing to the custom TTS network's 5-second RX1 / 6-second RX2 schedule after session restore or activation.
+- **Why:** Hardware E2E on `ttn.hazemon.in.th` showed backend ACK downlinks were being scheduled around 5 seconds after uplink while Board B was opening an earlier RX window, causing custody records to remain unreleased despite backend ACK queueing.
+- **Conflict risk:** Low - wrapper-owned Board B LoRaWAN driver, but revisit if RadioLib session-buffer offsets change.
 
 ### New Files
 

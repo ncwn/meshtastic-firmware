@@ -193,5 +193,5 @@ SELFCIUS code starts using a new internal surface.
 | Officer and relay DTN filesystem locking | `spiLock` | `SPILock.h` | Medium |
 | SOS scheduler jitter source | `esp_random()` | ESP-IDF random API | Low |
 
-**Last software verified:** 2026-04-28 against `daf00521e` / firmware `2.7.22.daf0052` during Phase 1C finding-fix verification.
-**Last hardware verified:** 2026-04-28 against `daf00521e` / firmware `2.7.22.daf0052` for relay observe/store bench proof; officers remained on prior Phase 1C firmware during the final relay-only finding-fix pass.
+**Last software verified:** 2026-05-12 on the wrapper `selfcius/mesh-first-prd` branch: SELFCIUS native suite 303/303 passed, `selfcius-officer` and `selfcius-relay-mesh` builds passed, and Board B standalone envs built successfully.
+**Last hardware verified:** 2026-05-12 on bench firmware `2.7.22.4af0965` plus Board B `v0.2.0`: all Meshtastic nodes were flashed with clean LittleFS images, factory-reset/configured with scanner-confirmed identities, Board B was chip-erased/reflashed/uploadfs, and the custom TTS backend ACK path was bench-proven to Board B custody release. Treat this as bench validation only, not field readiness.

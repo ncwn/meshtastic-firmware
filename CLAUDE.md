@@ -123,8 +123,8 @@
 - **Conflict risk:** Low - wrapper-owned LittleFS backend surface
 
 ### src/selfcius/common/dtn/selfcius_littlefs_storage.cpp
-- **What:** Returned structured LittleFS append/write failure reasons instead of a single generic failure path
-- **Why:** Makes Officer D218 `store_result=5` diagnostics actionable during bench validation and preserves non-destructive debugging
+- **What:** Returned structured LittleFS append/write failure reasons instead of a single generic failure path; added watchdog-safe directory scans during `init()`/`clear()`, deferred `.dat.tmp` orphan cleanup to a post-scan pass, and bounded slot enumeration to the storage cap
+- **Why:** Makes Officer D218 `store_result=5` diagnostics actionable during bench validation, and Board B 512-record real-flash drills showed long LittleFS scans can trip the watchdog and that stale `.dat.tmp` orphans must be reconciled on mount without destroying `.dat` custody files
 - **Conflict risk:** Low - wrapper-owned LittleFS backend implementation
 
 ### src/selfcius/common/dtn/selfcius_memory_storage.h
@@ -146,6 +146,21 @@
 - **What:** Normalized the RadioLib ABP session RX timing to the custom TTS network's 5-second RX1 / 6-second RX2 schedule after session restore or activation.
 - **Why:** Hardware E2E on `ttn.hazemon.in.th` showed backend ACK downlinks were being scheduled around 5 seconds after uplink while Board B was opening an earlier RX window, causing custody records to remain unreleased despite backend ACK queueing.
 - **Conflict risk:** Low - wrapper-owned Board B LoRaWAN driver, but revisit if RadioLib session-buffer offsets change.
+
+### src/selfcius/relay_lorawan/board_b_store.h
+- **What:** Added a rebuild service hook and payload-level stored-key counting for Board B diagnostics.
+- **Why:** Full 512-record real-flash rebuild and latest-GPS replacement drills need watchdog-safe scans plus proof that the expected newer origin/sequence/hash is present and the older same-origin key is absent.
+- **Conflict risk:** Low - wrapper-owned Board B record store API.
+
+### src/selfcius/relay_lorawan/board_b_store.cpp
+- **What:** Services the optional hook during rebuild/count scans and exposes `countStoredKey()` for payload-level replacement proof.
+- **Why:** Hardware drills showed long LittleFS scans can trip the watchdog, and count-only rebuild evidence cannot prove same-origin latest-GPS replacement.
+- **Conflict risk:** Low - wrapper-owned Board B record store implementation.
+
+### src/selfcius/relay_lorawan/src/main.cpp
+- **What:** Added compile-gated USB bench commands for clearing records, creating/checking `.dat.tmp` orphans, and printing GPS replacement proof, plus watchdog servicing during Board B rebuilds.
+- **Why:** Board B real-flash storage drills must be repeatable through reusable tooling and must prove payload-level replacement without enabling bench-only USB injection in production firmware.
+- **Conflict risk:** Low - standalone wrapper-owned Board B firmware, compile-gated for bench-only commands.
 
 ### New Files
 

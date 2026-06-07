@@ -79,6 +79,11 @@
 - **Why:** The wrapper repo exposes SELFCIUS sources into `src/selfcius` via symlink for custom environments. Stock Meshtastic builds must ignore that tree unless a SELFCIUS-specific environment explicitly opts back in.
 - **Conflict risk:** Medium - upstream build filter changes in `platformio.ini` could overlap
 
+### variants/selfcius/platformio.ini
+- **What:** Added env:selfcius-officer-v4 (extends env:heltec-v4) for the Heltec V4 officer role; reuses the officer -D flags + build_src_filter, inherits V4 16MB partitions + FEM handling.
+- **Why:** Defines wrapper-owned SELFCIUS PlatformIO environments without changing stock Meshtastic build targets.
+- **Conflict risk:** Low - wrapper-owned overlay configuration loaded only by the SELFCIUS symlink setup
+
 ### CLAUDE.md
 - **What:** Updated guidance with durable SELFCIUS bench node identity, scanner-first flash/reset rules, GPS provisioning readback requirements, and bench-validation wording
 - **Why:** USB serial device paths change between sessions; future agents must map hardware by node ID/MAC/role/`pioEnv` and avoid overstating bench evidence as field readiness

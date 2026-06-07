@@ -123,8 +123,8 @@
 - **Conflict risk:** Low - wrapper-owned LittleFS backend surface
 
 ### src/selfcius/common/dtn/selfcius_littlefs_storage.cpp
-- **What:** Returned structured LittleFS append/write failure reasons instead of a single generic failure path; added watchdog-safe directory scans during `init()`/`clear()`, deferred `.dat.tmp` orphan cleanup to a post-scan pass, and bounded slot enumeration to the storage cap
-- **Why:** Makes Officer D218 `store_result=5` diagnostics actionable during bench validation, and Board B 512-record real-flash drills showed long LittleFS scans can trip the watchdog and that stale `.dat.tmp` orphans must be reconciled on mount without destroying `.dat` custody files
+- **What:** Returned structured LittleFS append/write failure reasons instead of a single generic failure path; added watchdog-safe directory scans during `init()`/`clear()`, deferred `.dat.tmp` orphan cleanup to a post-scan pass, and bounded slot enumeration to the storage cap. `updateStatus()` now reuses the atomic temp+rename path of `replace()` instead of truncating the record file in place
+- **Why:** Makes Officer D218 `store_result=5` diagnostics actionable during bench validation, and Board B 512-record real-flash drills showed long LittleFS scans can trip the watchdog and that stale `.dat.tmp` orphans must be reconciled on mount without destroying `.dat` custody files. In-place `updateStatus()` truncation left a corruption window where a reset during a custody status transition could lose the only on-flash copy of a record (audit F28)
 - **Conflict risk:** Low - wrapper-owned LittleFS backend implementation
 
 ### src/selfcius/common/dtn/selfcius_memory_storage.h
@@ -153,8 +153,8 @@
 - **Conflict risk:** Low - wrapper-owned Board B record store API.
 
 ### src/selfcius/relay_lorawan/board_b_store.cpp
-- **What:** Services the optional hook during rebuild/count scans and exposes `countStoredKey()` for payload-level replacement proof.
-- **Why:** Hardware drills showed long LittleFS scans can trip the watchdog, and count-only rebuild evidence cannot prove same-origin latest-GPS replacement.
+- **What:** Services the optional hook during rebuild/count scans and exposes `countStoredKey()` for payload-level replacement proof. Latest-GPS supersession now collapses only `Received` records: a newer same-origin GPS no longer replaces an in-flight `UplinkPending`/`Uplinked` record (drop-older still applies against in-flight via `latestSeqForOrigin`).
+- **Why:** Hardware drills showed long LittleFS scans can trip the watchdog, and count-only rebuild evidence cannot prove same-origin latest-GPS replacement. Superseding an in-flight record deleted it before its backend fingerprint ACK arrived, losing custody/audit of a record that had already been transmitted (audit F50).
 - **Conflict risk:** Low - wrapper-owned Board B record store implementation.
 
 ### src/selfcius/relay_lorawan/src/main.cpp

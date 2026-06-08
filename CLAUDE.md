@@ -107,6 +107,11 @@
 - **Why:** Phase 1C extended persisted DTN records with ingress node IDs; legacy bench records must migrate without being mistaken for corrupt segments or silently removed
 - **Conflict risk:** Low - wrapper-owned SELFCIUS storage codec/backend only
 
+### src/selfcius/common/selfcius_config.h
+- **What:** Added `SELFCIUS_DTN_PRIVATE_CHANNEL_INDEX` as the shared compile-time DTN channel index for officer transmit and relay admission.
+- **Why:** Stage 1 private-channel migration needs one firmware-wide channel index before provisioning scripts and bench PSK rollout wire a non-default value.
+- **Conflict risk:** Low - wrapper-owned SELFCIUS config header.
+
 ### src/selfcius/common/dtn/selfcius_dtn_storage.h
 - **What:** Added a backend append-reason hook so DTN callers can distinguish storage failure modes beyond a bare `-1`
 - **Why:** Hardware validation on Officer D218 surfaced `store_result=5` without enough context to tell full-storage from LittleFS write/open failures
@@ -146,6 +151,17 @@
 - **What:** Expanded officer DTN store failure logs to include symbolic store-result names, LittleFS append failure reasons, and current stored-record count
 - **Why:** Hardware validation on Officer D218 showed `store_result=5` but not the concrete storage boundary that caused it
 - **Conflict risk:** Low - wrapper-owned officer overlay diagnostics
+- **What:** Sends SELFCIUS DTN packets on `SELFCIUS_DTN_PRIVATE_CHANNEL_INDEX` instead of hardcoded channel 0.
+- **Why:** Prepares officer firmware for the dedicated private Meshtastic channel while preserving channel-0 behavior until provisioning changes the index.
+- **Conflict risk:** Low - wrapper-owned officer overlay module.
+- **What:** Threads `SELFCIUS_DTN_PRIVATE_CHANNEL_INDEX` through the officer receive drain path and packet admission check instead of hardcoded channel 0.
+- **Why:** Keeps officer receive symmetry with transmit/admission so the future non-default private channel can work without silently breaking peer-officer DTN.
+- **Conflict risk:** Low - wrapper-owned officer mesh transport module.
+
+### src/selfcius/relay_mesh/selfcius_relay_module.cpp
+- **What:** Passes an explicit `RelayAdmissionConfig` using `SELFCIUS_DTN_PRIVATE_CHANNEL_INDEX`, with allowlist enabled and forwarded SOS disabled.
+- **Why:** Wires the relay admission seam into the live Board A path without weakening the current lab allowlist or reopening C18.
+- **Conflict risk:** Low - wrapper-owned relay overlay module.
 
 ### src/selfcius/relay_lorawan/lorawan_driver.cpp
 - **What:** Normalized the RadioLib ABP session RX timing to the custom TTS network's 5-second RX1 / 6-second RX2 schedule after session restore or activation.

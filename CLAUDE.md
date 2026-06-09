@@ -114,11 +114,27 @@
 - **What:** Added `SELFCIUS_RELAY_ALLOWLIST_ENABLED`, defaulting to `0`, with a 0/1 static assertion for compile-time lab allowlist overrides.
 - **Why:** ADR-009 admission now relies on channel-key membership; the per-node relay allowlist must default open in firmware source while remaining available as explicit lab defense-in-depth.
 - **Conflict risk:** Low - wrapper-owned SELFCIUS config header.
+- **What:** Added relay replay-floor and DTN metadata cap constants.
+- **Why:** Stage-1 increment 4 needs a bounded persistent per-origin monotonic floor table for replay rejection that survives relay record eviction and reboot.
+- **Conflict risk:** Low - wrapper-owned SELFCIUS config header.
 
 ### src/selfcius/common/dtn/selfcius_dtn_storage.h
 - **What:** Added a backend append-reason hook so DTN callers can distinguish storage failure modes beyond a bare `-1`
 - **Why:** Hardware validation on Officer D218 surfaced `store_result=5` without enough context to tell full-storage from LittleFS write/open failures
 - **Conflict risk:** Low - wrapper-owned DTN backend interface used only by SELFCIUS storage implementations
+- **What:** Added a minimal optional backend metadata blob API.
+- **Why:** Relay replay-floor metadata must persist independently of individual DTN record files so replay protection survives cap eviction and reboot.
+- **Conflict risk:** Low - wrapper-owned DTN backend interface used only by SELFCIUS storage implementations
+
+### src/selfcius/common/dtn/selfcius_relay_dtn_store.h
+- **What:** Added in-memory per-origin replay-floor state for relay-observed records.
+- **Why:** Stage-1 increment 4 requires relay inbound monotonic sequence floors to reject equal/lower origin sequences per origin.
+- **Conflict risk:** Low - wrapper-owned relay DTN store surface.
+
+### src/selfcius/common/dtn/selfcius_relay_dtn_store.cpp
+- **What:** Loads, persists, rebuild-merges, and enforces per-origin relay replay floors, mapping floor hits to `RejectedByPolicy`.
+- **Why:** Relay inbound replay rejection must survive record purge/eviction and reboot while advancing only after a record is actually accepted/stored.
+- **Conflict risk:** Low - wrapper-owned relay DTN store logic.
 
 ### src/selfcius/common/dtn/selfcius_dtn_store.h
 - **What:** Exposed the last DTN backend append result through `DtnStore`
@@ -134,20 +150,32 @@
 - **What:** Added typed LittleFS append failure reasons
 - **Why:** Officer validation needs to tell apart full-storage, no-free-slot, encode, open, and short-write failures without destructive probing
 - **Conflict risk:** Low - wrapper-owned LittleFS backend surface
+- **What:** Exposed support for the optional DTN metadata blob API.
+- **Why:** Relay replay-floor metadata needs a small persistent LittleFS sidecar separate from record slots.
+- **Conflict risk:** Low - wrapper-owned LittleFS backend surface
 
 ### src/selfcius/common/dtn/selfcius_littlefs_storage.cpp
 - **What:** Returned structured LittleFS append/write failure reasons instead of a single generic failure path; added watchdog-safe directory scans during `init()`/`clear()`, deferred `.dat.tmp` orphan cleanup to a post-scan pass, and bounded slot enumeration to the storage cap. `updateStatus()` now reuses the atomic temp+rename path of `replace()` instead of truncating the record file in place
 - **Why:** Makes Officer D218 `store_result=5` diagnostics actionable during bench validation, and Board B 512-record real-flash drills showed long LittleFS scans can trip the watchdog and that stale `.dat.tmp` orphans must be reconciled on mount without destroying `.dat` custody files. In-place `updateStatus()` truncation left a corruption window where a reset during a custody status transition could lose the only on-flash copy of a record (audit F28)
+- **Conflict risk:** Low - wrapper-owned LittleFS backend implementation
+- **What:** Added a keyed metadata sidecar read/write path, using temp-then-rename writes, and clears it with DTN storage.
+- **Why:** Relay replay floors must persist across record eviction and reboot while keeping the previous floor intact if a metadata write fails mid-update; destructive storage clear operations must still reset the sidecar.
 - **Conflict risk:** Low - wrapper-owned LittleFS backend implementation
 
 ### src/selfcius/common/dtn/selfcius_memory_storage.h
 - **What:** Added last-append-result tracking to the native in-memory DTN backend
 - **Why:** Keeps host-native tests aligned with the new DTN backend failure introspection API
 - **Conflict risk:** Low - wrapper-owned native test backend
+- **What:** Added an in-memory metadata blob buffer cleared with storage.
+- **Why:** Native tests need replay-floor persistence across relay store object rebuilds without using LittleFS.
+- **Conflict risk:** Low - wrapper-owned native test backend
 
 ### src/selfcius/common/dtn/selfcius_memory_storage.cpp
 - **What:** Recorded the last append result in the native in-memory DTN backend
 - **Why:** Supports red-green tests for DTN backend failure provenance
+- **Conflict risk:** Low - wrapper-owned native test backend
+- **What:** Implemented read/write support for the in-memory metadata blob.
+- **Why:** Relay replay-floor tests need metadata to survive record purge and store reconstruction in the native environment.
 - **Conflict risk:** Low - wrapper-owned native test backend
 
 ### src/selfcius/officer/selfcius_officer_module.cpp

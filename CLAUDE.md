@@ -130,10 +130,16 @@
 - **What:** Added in-memory per-origin replay-floor state for relay-observed records.
 - **Why:** Stage-1 increment 4 requires relay inbound monotonic sequence floors to reject equal/lower origin sequences per origin.
 - **Conflict risk:** Low - wrapper-owned relay DTN store surface.
+- **What:** Moved the relay replay-floor metadata scratch buffer onto `RelayDtnStore` instead of using per-call stack arrays.
+- **Why:** ~4KB stack frames in the acceptance path were the most likely reboot vector on the 8KB ESP32 loop stack, so the scratch buffer now lives on the heap-backed relay store object.
+- **Conflict risk:** Low - wrapper-owned relay DTN store surface.
 
 ### src/selfcius/common/dtn/selfcius_relay_dtn_store.cpp
 - **What:** Loads, persists, rebuild-merges, and enforces per-origin relay replay floors, mapping floor hits to `RejectedByPolicy`.
 - **Why:** Relay inbound replay rejection must survive record purge/eviction and reboot while advancing only after a record is actually accepted/stored.
+- **Conflict risk:** Low - wrapper-owned relay DTN store logic.
+- **What:** Reused the object-owned replay-floor metadata scratch buffer in load and persist paths instead of allocating 4KB scratch arrays on the stack.
+- **Why:** ~4KB stack frames in the acceptance path were the most likely reboot vector on the 8KB ESP32 loop stack, so the metadata path now avoids that stack pressure.
 - **Conflict risk:** Low - wrapper-owned relay DTN store logic.
 
 ### src/selfcius/common/dtn/selfcius_dtn_store.h

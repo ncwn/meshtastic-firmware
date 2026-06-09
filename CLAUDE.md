@@ -111,6 +111,9 @@
 - **What:** Added `SELFCIUS_DTN_PRIVATE_CHANNEL_INDEX` as the shared compile-time DTN channel index for officer transmit and relay admission.
 - **Why:** Stage 1 private-channel migration needs one firmware-wide channel index before provisioning scripts and bench PSK rollout wire a non-default value.
 - **Conflict risk:** Low - wrapper-owned SELFCIUS config header.
+- **What:** Added `SELFCIUS_RELAY_ALLOWLIST_ENABLED`, defaulting to `0`, with a 0/1 static assertion for compile-time lab allowlist overrides.
+- **Why:** ADR-009 admission now relies on channel-key membership; the per-node relay allowlist must default open in firmware source while remaining available as explicit lab defense-in-depth.
+- **Conflict risk:** Low - wrapper-owned SELFCIUS config header.
 
 ### src/selfcius/common/dtn/selfcius_dtn_storage.h
 - **What:** Added a backend append-reason hook so DTN callers can distinguish storage failure modes beyond a bare `-1`
@@ -159,8 +162,8 @@
 - **Conflict risk:** Low - wrapper-owned officer mesh transport module.
 
 ### src/selfcius/relay_mesh/selfcius_relay_module.cpp
-- **What:** Passes an explicit `RelayAdmissionConfig` using `SELFCIUS_DTN_PRIVATE_CHANNEL_INDEX`, with allowlist enabled and forwarded SOS disabled.
-- **Why:** Wires the relay admission seam into the live Board A path without weakening the current lab allowlist or reopening C18.
+- **What:** Passes an explicit `RelayAdmissionConfig` using `SELFCIUS_DTN_PRIVATE_CHANNEL_INDEX`, `SELFCIUS_RELAY_ALLOWLIST_ENABLED != 0`, and forwarded SOS disabled.
+- **Why:** Wires the relay admission seam into the live Board A path while making channel-key membership the default sender admission layer and keeping forwarded-origin SOS gated off until per-record auth exists.
 - **Conflict risk:** Low - wrapper-owned relay overlay module.
 
 ### src/selfcius/relay_lorawan/lorawan_driver.cpp

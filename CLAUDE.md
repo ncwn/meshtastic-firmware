@@ -117,6 +117,9 @@
 - **What:** Added relay replay-floor and DTN metadata cap constants.
 - **Why:** Stage-1 increment 4 needs a bounded persistent per-origin monotonic floor table for replay rejection that survives relay record eviction and reboot.
 - **Conflict risk:** Low - wrapper-owned SELFCIUS config header.
+- **What:** Wrapped the four peer-SOS carry tuning constants in `#ifndef` guards, with defaults unchanged.
+- **Why:** G2 carry-forward bench needs a compressed-interval bench firmware while production keeps shipping values.
+- **Conflict risk:** Low - wrapper-owned SELFCIUS config header.
 
 ### src/selfcius/common/dtn/selfcius_dtn_storage.h
 - **What:** Added a backend append-reason hook so DTN callers can distinguish storage failure modes beyond a bare `-1`

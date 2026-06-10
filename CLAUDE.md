@@ -199,6 +199,9 @@
 - **What:** Passes an explicit `RelayAdmissionConfig` using `SELFCIUS_DTN_PRIVATE_CHANNEL_INDEX`, `SELFCIUS_RELAY_ALLOWLIST_ENABLED != 0`, and forwarded SOS disabled.
 - **Why:** Wires the relay admission seam into the live Board A path while making channel-key membership the default sender admission layer and keeping forwarded-origin SOS gated off until per-record auth exists.
 - **Conflict risk:** Low - wrapper-owned relay overlay module.
+- **What:** Gated relay rebuild allowlist policy on the same admission config as live packet processing, added the channel-0 boot warning, and made relay replay-floor table exhaustion audit-visible.
+- **Why:** Prevents default-open live admission records from being purged on reboot by a stale hardcoded allowlist, surfaces lab/public-channel builds at boot, and makes replay-floor table exhaustion visible as a distinct in-memory audit counter.
+- **Conflict risk:** Low - wrapper-owned relay overlay and SELFCIUS store/audit logic.
 
 ### src/selfcius/relay_lorawan/lorawan_driver.cpp
 - **What:** Normalized the RadioLib ABP session RX timing to the custom TTS network's 5-second RX1 / 6-second RX2 schedule after session restore or activation.

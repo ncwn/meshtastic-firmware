@@ -149,6 +149,9 @@
 - **What:** Exposed the last DTN backend append result through `DtnStore`
 - **Why:** Officer-side logs need the backend failure reason that triggered `BackendFailure` during live bench validation
 - **Conflict risk:** Low - wrapper-owned DTN store surface
+- **What:** Added a bounded coordinate-free DTN snapshot API for aggregate record counts and per-origin sequence ranges.
+- **Why:** AIT campus field checking needs post-walk officer readback evidence for own/heard GPS and SOS records without exposing real coordinates.
+- **Conflict risk:** Low - wrapper-owned DTN store read-only introspection.
 
 ### src/selfcius/common/dtn/selfcius_dtn_store.cpp
 - **What:** Captured backend append failure reasons when `storage.append()` fails
@@ -197,6 +200,9 @@
 - **What:** Threads `SELFCIUS_DTN_PRIVATE_CHANNEL_INDEX` through the officer receive drain path and packet admission check instead of hardcoded channel 0.
 - **Why:** Keeps officer receive symmetry with transmit/admission so the future non-default private channel can work without silently breaking peer-officer DTN.
 - **Conflict risk:** Low - wrapper-owned officer mesh transport module.
+- **What:** Logs a coordinate-free DTN snapshot after officer storage rebuild, including aggregate counts and per-origin suffix/sequence ranges.
+- **Why:** Field-check evidence needs a durable post-run readback path; serial reconnects reboot the board, so the boot log must expose LittleFS-backed state after rebuild.
+- **Conflict risk:** Low - wrapper-owned officer diagnostics only.
 
 ### src/selfcius/relay_mesh/selfcius_relay_module.cpp
 - **What:** Passes an explicit `RelayAdmissionConfig` using `SELFCIUS_DTN_PRIVATE_CHANNEL_INDEX`, `SELFCIUS_RELAY_ALLOWLIST_ENABLED != 0`, and forwarded SOS disabled.

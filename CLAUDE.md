@@ -106,6 +106,9 @@
 - **What:** Added Phase 1C compatibility migration from legacy `SDTN` stored-record frames to current `SDT2` frames with ingress provenance
 - **Why:** Phase 1C extended persisted DTN records with ingress node IDs; legacy bench records must migrate without being mistaken for corrupt segments or silently removed
 - **Conflict risk:** Low - wrapper-owned SELFCIUS storage codec/backend only
+- **What:** Updated SELFCIUS dependency tracking for the ADR-014 officer GPS sampler path: `nodeDB->localPosition` plus trusted RTC time, not direct `gps`, `gps->p`, or `gps->hasLock()` reads.
+- **Why:** The D2 capture-gate fix moved the live sampler away from instantaneous GPS lock state, so upstream merge checks must track the current NodeDB/RTC surfaces and not reintroduce stale GPS-pointer assumptions.
+- **Conflict risk:** Low - documentation-only update to fork guidance
 
 ### src/selfcius/common/selfcius_config.h
 - **What:** Added `SELFCIUS_DTN_PRIVATE_CHANNEL_INDEX` as the shared compile-time DTN channel index for officer transmit and relay admission.
@@ -266,8 +269,8 @@ SELFCIUS code starts using a new internal surface.
 | Periodic SELFCIUS worker threads | `concurrency::OSThread` | `concurrency/OSThread.h` | Low |
 | Officer and relay callback receive queue locking | `freertosinc.h`, `StaticSemaphore_t`, `xSemaphoreCreateMutexStatic()`, `xSemaphoreTake()`, `xSemaphoreGive()` | `freertosinc.h` | Medium |
 | DTN packet send submission | `service->sendToMesh()` | `mesh/MeshService.h` | Low |
-| Officer GPS read path | `gps`, `gps->p`, `gps->hasLock()`, `getValidTime(RTCQualityDevice)` | `gps/GPS.h`, `gps/RTC.h` | Medium |
-| Meshtastic-maintained local position state | `localPosition` and NodeDB helpers | `mesh/NodeDB.h` | Medium |
+| Officer no-position SOS timestamp read path | `getValidTime(RTCQualityDevice)` | `gps/RTC.h` | Medium |
+| Officer GPS sampler freshness-gated capture (ADR-014 D2) | `nodeDB->localPosition`, `nodeDB->hasLocalPositionSinceBoot()`, and explicit complete-coordinate checks | `mesh/NodeDB.h` | Medium |
 | Relay hop metrics | `meshtastic_MeshPacket::hop_start`, `hop_limit` | generated mesh packet types | Low |
 | Officer SOS button observation | `inputBroker`, `InputEvent`, `INPUT_BROKER_USER_PRESS`, `CallbackObserver` | `input/InputBroker.h` | Medium |
 | Officer OLED status/alert pages | `graphics::Screen`, `UIFrameEvent`, `OLEDDisplay`, `OLEDDisplayUi`, `ScreenFonts`, `screen->startAlert()`, `screen->endAlert()`, `screen->showSimpleBanner()` | `graphics/Screen.h`, OLED display headers | Medium |

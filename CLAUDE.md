@@ -147,6 +147,9 @@
 - **What:** Reused the object-owned replay-floor metadata scratch buffer in load and persist paths instead of allocating 4KB scratch arrays on the stack.
 - **Why:** ~4KB stack frames in the acceptance path were the most likely reboot vector on the 8KB ESP32 loop stack, so the metadata path now avoids that stack pressure.
 - **Conflict risk:** Low - wrapper-owned relay DTN store logic.
+- **What:** At the per-origin record cap, a routine (non-SOS) GPS record now also reclaims a DELIVERED (`BoardBStored`) same-origin record (dropped the prior `!sos` gate on `evictDeliveredForOrigin`); undelivered/in-flight records stay protected (backpressure).
+- **Why:** Only SOS could reclaim before, so a sustained-GPS officer with no SOS saturated its 64-slot quota and every further record `cap_rejected` -- which stops UART export (only `Captured` records forward) and silently stalled the whole custody chain (hardware-confirmed 2026-06-16: relay `gps=147 disp=cap_rejected fwd=0`, Board B `UART bytes=0`). Preserves REQ:SR-4 delivered-trail/eviction-priority (store still bounded at the cap); does not shrink the store.
+- **Conflict risk:** Low - wrapper-owned relay DTN store acceptance logic.
 
 ### src/selfcius/common/dtn/selfcius_dtn_store.h
 - **What:** Exposed the last DTN backend append result through `DtnStore`

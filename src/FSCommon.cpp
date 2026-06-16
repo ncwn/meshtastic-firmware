@@ -126,12 +126,26 @@ std::vector<meshtastic_FileInfo> getFiles(const char *dirname, uint8_t levels)
         if (file.isDirectory() && !String(file.name()).endsWith(".")) {
             if (levels) {
 #ifdef ARCH_ESP32
-                std::vector<meshtastic_FileInfo> subDirFilenames = getFiles(file.path(), levels - 1);
+                const char *selfciusSubPath = file.path();
 #else
-                std::vector<meshtastic_FileInfo> subDirFilenames = getFiles(file.name(), levels - 1);
+                const char *selfciusSubPath = file.name();
 #endif
-                filenames.insert(filenames.end(), subDirFilenames.begin(), subDirFilenames.end());
-                file.close();
+                // SELFCIUS: never enumerate the internal DTN custody record directory into a file
+                // manifest. A loaded officer/relay holds hundreds of /selfcius/rec/*.dat custody
+                // files; including them bloated the want_config manifest and delayed/aborted the
+                // Meshtastic CLI handshake on every connect. The directory only exists on SELFCIUS
+                // builds, so this is a no-op for stock firmware; listDir()/deletion are unaffected.
+                if (strcmp(selfciusSubPath, "/selfcius/rec") == 0) {
+                    file.close();
+                } else {
+#ifdef ARCH_ESP32
+                    std::vector<meshtastic_FileInfo> subDirFilenames = getFiles(file.path(), levels - 1);
+#else
+                    std::vector<meshtastic_FileInfo> subDirFilenames = getFiles(file.name(), levels - 1);
+#endif
+                    filenames.insert(filenames.end(), subDirFilenames.begin(), subDirFilenames.end());
+                    file.close();
+                }
             }
         } else {
             meshtastic_FileInfo fileInfo = {"", static_cast<uint32_t>(file.size())};

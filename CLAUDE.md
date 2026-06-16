@@ -74,6 +74,11 @@
 - **Why:** SELFCIUS officers can have many persisted `/selfcius/rec/*.dat` custody files; rebuilding the file manifest for node-info-only requests wastes heap and caused Officer 8154 to abort in `getFiles()` during BLE config sync.
 - **Conflict risk:** Medium - upstream phone API/config-sync changes may touch the same startup state machine.
 
+### src/FSCommon.cpp
+- **What:** `getFiles()` no longer descends into the `/selfcius/rec` DTN custody record directory when building a file listing/manifest (guarded by an exact-path check; `listDir()` and its delete path are untouched).
+- **Why:** This is the non-`SPECIAL_NONCE_ONLY_NODES` half of the PhoneAPI manifest fix above. A loaded officer/relay holds hundreds of `/selfcius/rec/*.dat` custody files; enumerating them into the `want_config` file manifest delayed config-complete on every CLI connect (the V4-relevant leg of the CLI-wedge, which does not reset on serial open). Skipping the subtree during descent avoids the enumeration cost entirely; the directory only exists on SELFCIUS builds, so stock firmware is unaffected.
+- **Conflict risk:** Medium - upstream filesystem/manifest changes may touch `getFiles()`.
+
 ### platformio.ini
 - **What:** Excluded `selfcius/` from the default Arduino `build_src_filter`
 - **Why:** The wrapper repo exposes SELFCIUS sources into `src/selfcius` via symlink for custom environments. Stock Meshtastic builds must ignore that tree unless a SELFCIUS-specific environment explicitly opts back in.

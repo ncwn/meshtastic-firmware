@@ -12,6 +12,11 @@
 - **Upstream repo:** meshtastic/firmware
 - **Fork repo:** ncwn/meshtastic-firmware
 
+## Nested Submodules
+
+- `protobufs`: `origin` = `ncwn/protobufs`, `upstream` = `meshtastic/protobufs`, branch `v4`, currently pinned at firmware-compatible commit `e30092e6168b13341c2b7ec4be19c789ad5cd77f` (`v2.7.21-6-ge30092e`).
+- `meshtestic`: upstream Meshtastic test fixture submodule, unchanged.
+
 ## Build
 
 - PlatformIO-based — see `platformio.ini` for targets
@@ -53,6 +58,11 @@
 - **Why:** Reason this modification is needed for the v4 project
 - **Conflict risk:** Low / Medium / High when merging upstream
 -->
+
+### .gitmodules
+- **What:** Repointed the nested `protobufs` submodule to `ncwn/protobufs` with branch `v4`, while keeping `upstream` as `meshtastic/protobufs` in the local checkout.
+- **Why:** SELFCIUS epoch provisioning requires a deliberate protobuf fork path before changing `admin.proto`, matching the v4 fork workflow used by the other Meshtastic submodules.
+- **Conflict risk:** Medium - protobuf upstream syncs and generated-code changes must coordinate with the pinned nested submodule commit.
 
 ### .gitignore
 - **What:** Added ignores for the SELFCIUS generated PlatformIO overlay symlinks: `/platformio_override.ini`, `/variants/selfcius/`, and `/src/selfcius/`
@@ -203,6 +213,26 @@
 - **What:** Implemented read/write support for the in-memory metadata blob.
 - **Why:** Relay replay-floor tests need metadata to survive record purge and store reconstruction in the native environment.
 - **Conflict risk:** Low - wrapper-owned native test backend
+
+### src/selfcius/common/protocol/selfcius_dtn_packet.{h,cpp}
+- **What:** Added `originEpoch` to the in-memory GPS record/key model while keeping schema-1 GPS batches wire-compatible; schema-1 parse maps epoch to `0`, and schema-1 encode rejects nonzero epochs.
+- **Why:** Epoch must become part of custody identity without silently transmitting a nonzero epoch through the legacy 27-byte packet format.
+- **Conflict risk:** Medium - shared SELFCIUS DTN identity surface used by officer, relay, Board B, and tests.
+
+### src/selfcius/common/protocol/selfcius_v2_packet.{h,cpp}
+- **What:** Added `originEpoch` to the existing disabled V2 record envelope and V2 canonical hash, restricted the legacy V1-compatible GPS hash scheme to epoch `0`, and updated V2 GPS batch capacity from 6 to 5 records.
+- **Why:** Protocol-level replay-floor recovery needs epoch in the V2 identity/hash before V2 transmit is enabled; keeping `SELFCIUS_DTN_V2_TRANSMIT_ENABLED=0` preserves parser-first rollout.
+- **Conflict risk:** Medium - disabled V2 protocol wire layout changed intentionally; coordinate with any future V2 transmit rollout.
+
+### src/selfcius/officer/selfcius_sequence_floor.h, src/selfcius/officer/selfcius_sequence_state.h
+- **What:** Added durable `originEpoch` beside the officer sequence floor, defaulting legacy floor-only state to epoch `0` and preserving epoch when reserving future sequence floors.
+- **Why:** Replay-floor recovery needs a stable officer generation value that survives normal firmware reflashes and is stamped independently from the monotonic sequence counter.
+- **Conflict risk:** Medium - shared officer custody identity state; coordinate with provisioning and relay replay-floor rollout.
+
+### src/selfcius/officer/gps/selfcius_gps_sampler.{h,cpp}
+- **What:** Threaded `originEpoch` through GPS sample input and stamped it onto valid-fix, stale-SOS, and no-lock SOS records.
+- **Why:** Every officer-originated custody record must carry the persisted generation before V2 transmit and epoch-aware replay floors are enabled.
+- **Conflict risk:** Low - wrapper-owned officer GPS capture path with native coverage.
 
 ### src/selfcius/officer/selfcius_officer_module.cpp
 - **What:** Expanded officer DTN store failure logs to include symbolic store-result names, LittleFS append failure reasons, and current stored-record count

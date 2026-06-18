@@ -144,6 +144,9 @@
 - **What:** Moved the relay replay-floor metadata scratch buffer onto `RelayDtnStore` instead of using per-call stack arrays.
 - **Why:** ~4KB stack frames in the acceptance path were the most likely reboot vector on the 8KB ESP32 loop stack, so the scratch buffer now lives on the heap-backed relay store object.
 - **Conflict risk:** Low - wrapper-owned relay DTN store surface.
+- **What:** Added a per-record relay policy-reject cause surface (`invalid_record` vs `replay_floor`) to the relay store/trace path.
+- **Why:** Field diagnostics must distinguish no-valid-fix records from stale replay-floor lockout before protocol-level epoch work.
+- **Conflict risk:** Low - wrapper-owned relay DTN store surface.
 
 ### src/selfcius/common/dtn/selfcius_relay_dtn_store.cpp
 - **What:** Loads, persists, rebuild-merges, and enforces per-origin relay replay floors, mapping floor hits to `RejectedByPolicy`.
@@ -214,6 +217,11 @@
 - **What:** Logs a coordinate-free DTN snapshot after officer storage rebuild, including aggregate counts and per-origin suffix/sequence ranges.
 - **Why:** Field-check evidence needs a durable post-run readback path; serial reconnects reboot the board, so the boot log must expose LittleFS-backed state after rebuild.
 - **Conflict risk:** Low - wrapper-owned officer diagnostics only.
+
+### src/selfcius/common/relay/selfcius_relay_log_format.{h,cpp}
+- **What:** Relay per-record logs now append `policy_reason=<none|invalid_record|replay_floor>` with native totality/format tests and summarizer token binding.
+- **Why:** Bench/field log analysis needs to classify `policy_rejected` records without destructive relay-floor resets.
+- **Conflict risk:** Low - wrapper-owned SELFCIUS log contract.
 
 ### src/selfcius/relay_mesh/selfcius_relay_module.cpp
 - **What:** Passes an explicit `RelayAdmissionConfig` using `SELFCIUS_DTN_PRIVATE_CHANNEL_INDEX`, `SELFCIUS_RELAY_ALLOWLIST_ENABLED != 0`, and forwarded SOS disabled.

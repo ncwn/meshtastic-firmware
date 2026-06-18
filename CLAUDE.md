@@ -79,6 +79,11 @@
 - **Why:** SELFCIUS trims WiFi for ESP32 officer/relay builds. Without this guard, `AdminModule` references OTA symbols that are not compiled in and breaks the build.
 - **Conflict risk:** Medium - upstream OTA/admin changes could touch the same switch case
 
+### src/mesh/generated/meshtastic/admin.pb.{h,cpp}
+- **What:** Regenerated nanopb admin bindings after adding the `SelfciusEpoch` admin payload in the nested protobufs submodule.
+- **Why:** Officer firmware needs a typed admin request/response surface to read or set the SELFCIUS origin epoch without overloading unrelated Meshtastic admin fields.
+- **Conflict risk:** Medium - generated admin bindings must stay in lock-step with `protobufs/meshtastic/admin.proto`.
+
 ### src/mesh/PhoneAPI.cpp
 - **What:** Skipped the recursive filesystem manifest scan for `SPECIAL_NONCE_ONLY_NODES` BLE config requests.
 - **Why:** SELFCIUS officers can have many persisted `/selfcius/rec/*.dat` custody files; rebuilding the file manifest for node-info-only requests wastes heap and caused Officer 8154 to abort in `getFiles()` during BLE config sync.
@@ -247,6 +252,9 @@
 - **What:** Logs a coordinate-free DTN snapshot after officer storage rebuild, including aggregate counts and per-origin suffix/sequence ranges.
 - **Why:** Field-check evidence needs a durable post-run readback path; serial reconnects reboot the board, so the boot log must expose LittleFS-backed state after rebuild.
 - **Conflict risk:** Low - wrapper-owned officer diagnostics only.
+- **What:** Handles the SELFCIUS admin epoch request/response, allowing local admin clients to read or set the persisted `originEpoch` and read the reserved sequence floor.
+- **Why:** Factory reset/reprovision must explicitly set an officer generation instead of relying on a local counter erased by reset.
+- **Conflict risk:** Medium - wrapper-owned officer module, but depends on the generated admin protobuf surface.
 
 ### src/selfcius/common/relay/selfcius_relay_log_format.{h,cpp}
 - **What:** Relay per-record logs now append `policy_reason=<none|invalid_record|replay_floor>` with native totality/format tests and summarizer token binding.

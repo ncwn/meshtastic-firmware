@@ -93,6 +93,11 @@ typedef enum _meshtastic_AdminMessage_BackupLocation {
     meshtastic_AdminMessage_BackupLocation_SD = 1
 } meshtastic_AdminMessage_BackupLocation;
 
+typedef enum _meshtastic_SelfciusEpoch_Action {
+    meshtastic_SelfciusEpoch_Action_READ = 0,
+    meshtastic_SelfciusEpoch_Action_SET = 1
+} meshtastic_SelfciusEpoch_Action;
+
 /* Three stages of this request. */
 typedef enum _meshtastic_KeyVerificationAdmin_MessageType {
     /* This is the first stage, where a client initiates */
@@ -129,6 +134,14 @@ typedef struct _meshtastic_AdminMessage_OTAEvent {
  Used to verify the integrity of the firmware before applying an update. */
     meshtastic_AdminMessage_OTAEvent_ota_hash_t ota_hash;
 } meshtastic_AdminMessage_OTAEvent;
+
+/* SELFCIUS officer epoch provisioning request/response. */
+typedef struct _meshtastic_SelfciusEpoch {
+    meshtastic_SelfciusEpoch_Action action;
+    uint32_t origin_epoch;
+    uint32_t sequence_floor;
+    bool success;
+} meshtastic_SelfciusEpoch;
 
 /* Parameters for setting up Meshtastic for ameteur radio usage */
 typedef struct _meshtastic_HamParameters {
@@ -362,6 +375,8 @@ typedef struct _meshtastic_AdminMessage {
         meshtastic_SharedContact add_contact;
         /* Initiate or respond to a key verification request */
         meshtastic_KeyVerificationAdmin key_verification;
+        /* Read or set SELFCIUS officer epoch state. */
+        meshtastic_SelfciusEpoch selfcius_epoch;
         /* Tell the node to factory reset config everything; all device state and configuration will be returned to factory defaults and BLE bonds will be cleared. */
         int32_t factory_reset_device;
         /* Tell the node to reboot into the OTA Firmware in this many seconds (or <0 to cancel reboot)
@@ -413,6 +428,10 @@ extern "C" {
 #define _meshtastic_AdminMessage_BackupLocation_MAX meshtastic_AdminMessage_BackupLocation_SD
 #define _meshtastic_AdminMessage_BackupLocation_ARRAYSIZE ((meshtastic_AdminMessage_BackupLocation)(meshtastic_AdminMessage_BackupLocation_SD+1))
 
+#define _meshtastic_SelfciusEpoch_Action_MIN meshtastic_SelfciusEpoch_Action_READ
+#define _meshtastic_SelfciusEpoch_Action_MAX meshtastic_SelfciusEpoch_Action_SET
+#define _meshtastic_SelfciusEpoch_Action_ARRAYSIZE ((meshtastic_SelfciusEpoch_Action)(meshtastic_SelfciusEpoch_Action_SET+1))
+
 #define _meshtastic_KeyVerificationAdmin_MessageType_MIN meshtastic_KeyVerificationAdmin_MessageType_INITIATE_VERIFICATION
 #define _meshtastic_KeyVerificationAdmin_MessageType_MAX meshtastic_KeyVerificationAdmin_MessageType_DO_NOT_VERIFY
 #define _meshtastic_KeyVerificationAdmin_MessageType_ARRAYSIZE ((meshtastic_KeyVerificationAdmin_MessageType)(meshtastic_KeyVerificationAdmin_MessageType_DO_NOT_VERIFY+1))
@@ -425,6 +444,8 @@ extern "C" {
 
 
 #define meshtastic_AdminMessage_OTAEvent_reboot_ota_mode_ENUMTYPE meshtastic_OTAMode
+
+#define meshtastic_SelfciusEpoch_action_ENUMTYPE meshtastic_SelfciusEpoch_Action
 
 
 
@@ -441,6 +462,7 @@ extern "C" {
 #define meshtastic_AdminMessage_init_default     {0, {0}, {0, {0}}}
 #define meshtastic_AdminMessage_InputEvent_init_default {0, 0, 0, 0}
 #define meshtastic_AdminMessage_OTAEvent_init_default {_meshtastic_OTAMode_MIN, {0, {0}}}
+#define meshtastic_SelfciusEpoch_init_default    {_meshtastic_SelfciusEpoch_Action_MIN, 0, 0, 0}
 #define meshtastic_HamParameters_init_default    {"", 0, 0, ""}
 #define meshtastic_NodeRemoteHardwarePinsResponse_init_default {0, {meshtastic_NodeRemoteHardwarePin_init_default, meshtastic_NodeRemoteHardwarePin_init_default, meshtastic_NodeRemoteHardwarePin_init_default, meshtastic_NodeRemoteHardwarePin_init_default, meshtastic_NodeRemoteHardwarePin_init_default, meshtastic_NodeRemoteHardwarePin_init_default, meshtastic_NodeRemoteHardwarePin_init_default, meshtastic_NodeRemoteHardwarePin_init_default, meshtastic_NodeRemoteHardwarePin_init_default, meshtastic_NodeRemoteHardwarePin_init_default, meshtastic_NodeRemoteHardwarePin_init_default, meshtastic_NodeRemoteHardwarePin_init_default, meshtastic_NodeRemoteHardwarePin_init_default, meshtastic_NodeRemoteHardwarePin_init_default, meshtastic_NodeRemoteHardwarePin_init_default, meshtastic_NodeRemoteHardwarePin_init_default}}
 #define meshtastic_SharedContact_init_default    {0, false, meshtastic_User_init_default, 0, 0}
@@ -453,6 +475,7 @@ extern "C" {
 #define meshtastic_AdminMessage_init_zero        {0, {0}, {0, {0}}}
 #define meshtastic_AdminMessage_InputEvent_init_zero {0, 0, 0, 0}
 #define meshtastic_AdminMessage_OTAEvent_init_zero {_meshtastic_OTAMode_MIN, {0, {0}}}
+#define meshtastic_SelfciusEpoch_init_zero       {_meshtastic_SelfciusEpoch_Action_MIN, 0, 0, 0}
 #define meshtastic_HamParameters_init_zero       {"", 0, 0, ""}
 #define meshtastic_NodeRemoteHardwarePinsResponse_init_zero {0, {meshtastic_NodeRemoteHardwarePin_init_zero, meshtastic_NodeRemoteHardwarePin_init_zero, meshtastic_NodeRemoteHardwarePin_init_zero, meshtastic_NodeRemoteHardwarePin_init_zero, meshtastic_NodeRemoteHardwarePin_init_zero, meshtastic_NodeRemoteHardwarePin_init_zero, meshtastic_NodeRemoteHardwarePin_init_zero, meshtastic_NodeRemoteHardwarePin_init_zero, meshtastic_NodeRemoteHardwarePin_init_zero, meshtastic_NodeRemoteHardwarePin_init_zero, meshtastic_NodeRemoteHardwarePin_init_zero, meshtastic_NodeRemoteHardwarePin_init_zero, meshtastic_NodeRemoteHardwarePin_init_zero, meshtastic_NodeRemoteHardwarePin_init_zero, meshtastic_NodeRemoteHardwarePin_init_zero, meshtastic_NodeRemoteHardwarePin_init_zero}}
 #define meshtastic_SharedContact_init_zero       {0, false, meshtastic_User_init_zero, 0, 0}
@@ -470,6 +493,10 @@ extern "C" {
 #define meshtastic_AdminMessage_InputEvent_touch_y_tag 4
 #define meshtastic_AdminMessage_OTAEvent_reboot_ota_mode_tag 1
 #define meshtastic_AdminMessage_OTAEvent_ota_hash_tag 2
+#define meshtastic_SelfciusEpoch_action_tag      1
+#define meshtastic_SelfciusEpoch_origin_epoch_tag 2
+#define meshtastic_SelfciusEpoch_sequence_floor_tag 3
+#define meshtastic_SelfciusEpoch_success_tag     4
 #define meshtastic_HamParameters_call_sign_tag   1
 #define meshtastic_HamParameters_tx_power_tag    2
 #define meshtastic_HamParameters_frequency_tag   3
@@ -551,6 +578,7 @@ extern "C" {
 #define meshtastic_AdminMessage_commit_edit_settings_tag 65
 #define meshtastic_AdminMessage_add_contact_tag  66
 #define meshtastic_AdminMessage_key_verification_tag 67
+#define meshtastic_AdminMessage_selfcius_epoch_tag 68
 #define meshtastic_AdminMessage_factory_reset_device_tag 94
 #define meshtastic_AdminMessage_reboot_ota_seconds_tag 95
 #define meshtastic_AdminMessage_exit_simulator_tag 96
@@ -612,6 +640,7 @@ X(a, STATIC,   ONEOF,    BOOL,     (payload_variant,begin_edit_settings,begin_ed
 X(a, STATIC,   ONEOF,    BOOL,     (payload_variant,commit_edit_settings,commit_edit_settings),  65) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (payload_variant,add_contact,add_contact),  66) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (payload_variant,key_verification,key_verification),  67) \
+X(a, STATIC,   ONEOF,    MESSAGE,  (payload_variant,selfcius_epoch,selfcius_epoch),  68) \
 X(a, STATIC,   ONEOF,    INT32,    (payload_variant,factory_reset_device,factory_reset_device),  94) \
 X(a, STATIC,   ONEOF,    INT32,    (payload_variant,reboot_ota_seconds,reboot_ota_seconds),  95) \
 X(a, STATIC,   ONEOF,    BOOL,     (payload_variant,exit_simulator,exit_simulator),  96) \
@@ -642,6 +671,7 @@ X(a, STATIC,   ONEOF,    MESSAGE,  (payload_variant,sensor_config,sensor_config)
 #define meshtastic_AdminMessage_payload_variant_store_ui_config_MSGTYPE meshtastic_DeviceUIConfig
 #define meshtastic_AdminMessage_payload_variant_add_contact_MSGTYPE meshtastic_SharedContact
 #define meshtastic_AdminMessage_payload_variant_key_verification_MSGTYPE meshtastic_KeyVerificationAdmin
+#define meshtastic_AdminMessage_payload_variant_selfcius_epoch_MSGTYPE meshtastic_SelfciusEpoch
 #define meshtastic_AdminMessage_payload_variant_ota_request_MSGTYPE meshtastic_AdminMessage_OTAEvent
 #define meshtastic_AdminMessage_payload_variant_sensor_config_MSGTYPE meshtastic_SensorConfig
 
@@ -658,6 +688,14 @@ X(a, STATIC,   SINGULAR, UENUM,    reboot_ota_mode,   1) \
 X(a, STATIC,   SINGULAR, BYTES,    ota_hash,          2)
 #define meshtastic_AdminMessage_OTAEvent_CALLBACK NULL
 #define meshtastic_AdminMessage_OTAEvent_DEFAULT NULL
+
+#define meshtastic_SelfciusEpoch_FIELDLIST(X, a) \
+X(a, STATIC,   SINGULAR, UENUM,    action,            1) \
+X(a, STATIC,   SINGULAR, UINT32,   origin_epoch,      2) \
+X(a, STATIC,   SINGULAR, UINT32,   sequence_floor,    3) \
+X(a, STATIC,   SINGULAR, BOOL,     success,           4)
+#define meshtastic_SelfciusEpoch_CALLBACK NULL
+#define meshtastic_SelfciusEpoch_DEFAULT NULL
 
 #define meshtastic_HamParameters_FIELDLIST(X, a) \
 X(a, STATIC,   SINGULAR, STRING,   call_sign,         1) \
@@ -737,6 +775,7 @@ X(a, STATIC,   OPTIONAL, UINT32,   set_accuracy,      1)
 extern const pb_msgdesc_t meshtastic_AdminMessage_msg;
 extern const pb_msgdesc_t meshtastic_AdminMessage_InputEvent_msg;
 extern const pb_msgdesc_t meshtastic_AdminMessage_OTAEvent_msg;
+extern const pb_msgdesc_t meshtastic_SelfciusEpoch_msg;
 extern const pb_msgdesc_t meshtastic_HamParameters_msg;
 extern const pb_msgdesc_t meshtastic_NodeRemoteHardwarePinsResponse_msg;
 extern const pb_msgdesc_t meshtastic_SharedContact_msg;
@@ -751,6 +790,7 @@ extern const pb_msgdesc_t meshtastic_SHTXX_config_msg;
 #define meshtastic_AdminMessage_fields &meshtastic_AdminMessage_msg
 #define meshtastic_AdminMessage_InputEvent_fields &meshtastic_AdminMessage_InputEvent_msg
 #define meshtastic_AdminMessage_OTAEvent_fields &meshtastic_AdminMessage_OTAEvent_msg
+#define meshtastic_SelfciusEpoch_fields &meshtastic_SelfciusEpoch_msg
 #define meshtastic_HamParameters_fields &meshtastic_HamParameters_msg
 #define meshtastic_NodeRemoteHardwarePinsResponse_fields &meshtastic_NodeRemoteHardwarePinsResponse_msg
 #define meshtastic_SharedContact_fields &meshtastic_SharedContact_msg
@@ -773,6 +813,7 @@ extern const pb_msgdesc_t meshtastic_SHTXX_config_msg;
 #define meshtastic_SCD4X_config_size             29
 #define meshtastic_SEN5X_config_size             7
 #define meshtastic_SHTXX_config_size             6
+#define meshtastic_SelfciusEpoch_size            16
 #define meshtastic_SensorConfig_size             77
 #define meshtastic_SharedContact_size            127
 

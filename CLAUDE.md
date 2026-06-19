@@ -137,8 +137,8 @@
 - **What:** Added `SELFCIUS_RELAY_ALLOWLIST_ENABLED`, defaulting to `0`, with a 0/1 static assertion for compile-time lab allowlist overrides.
 - **Why:** ADR-009 admission now relies on channel-key membership; the per-node relay allowlist must default open in firmware source while remaining available as explicit lab defense-in-depth.
 - **Conflict risk:** Low - wrapper-owned SELFCIUS config header.
-- **What:** Added relay replay-floor and DTN metadata cap constants.
-- **Why:** Stage-1 increment 4 needs a bounded persistent per-origin monotonic floor table for replay rejection that survives relay record eviction and reboot.
+- **What:** Added relay replay-floor and DTN metadata cap constants; increased the metadata scratch cap to fit v2 epoch-aware replay-floor entries.
+- **Why:** Stage-1 increment 4 needs a bounded persistent per-origin monotonic floor table for replay rejection that survives relay record eviction and reboot; the officer-epoch recovery path stores `(originNodeId,maxEpoch,maxSequence)` per floor.
 - **Conflict risk:** Low - wrapper-owned SELFCIUS config header.
 - **What:** Wrapped the three peer-SOS carry timing constants (`SELFCIUS_DTN_PEER_SOS_CARRY_MIN_INTERVAL_MS`, `SELFCIUS_DTN_PEER_SOS_CARRY_MAX_INTERVAL_MS`, and `SELFCIUS_DTN_PEER_SOS_PRESSURE_DEFER_MS`) in `#ifndef` guards, with defaults unchanged.
 - **Why:** G2 carry-forward bench needs compressed timing overrides while production keeps shipping values.
@@ -153,8 +153,8 @@
 - **Conflict risk:** Low - wrapper-owned DTN backend interface used only by SELFCIUS storage implementations
 
 ### src/selfcius/common/dtn/selfcius_relay_dtn_store.h
-- **What:** Added in-memory per-origin replay-floor state for relay-observed records.
-- **Why:** Stage-1 increment 4 requires relay inbound monotonic sequence floors to reject equal/lower origin sequences per origin.
+- **What:** Added in-memory per-origin replay-floor state for relay-observed records; floor entries now track max accepted epoch plus max accepted sequence.
+- **Why:** Stage-1 increment 4 requires relay inbound monotonic sequence floors to reject equal/lower origin sequences per origin, and the officer-epoch recovery path needs a higher epoch to reset the sequence floor without clearing relay storage.
 - **Conflict risk:** Low - wrapper-owned relay DTN store surface.
 - **What:** Moved the relay replay-floor metadata scratch buffer onto `RelayDtnStore` instead of using per-call stack arrays.
 - **Why:** ~4KB stack frames in the acceptance path were the most likely reboot vector on the 8KB ESP32 loop stack, so the scratch buffer now lives on the heap-backed relay store object.
@@ -164,8 +164,8 @@
 - **Conflict risk:** Low - wrapper-owned relay DTN store surface.
 
 ### src/selfcius/common/dtn/selfcius_relay_dtn_store.cpp
-- **What:** Loads, persists, rebuild-merges, and enforces per-origin relay replay floors, mapping floor hits to `RejectedByPolicy`.
-- **Why:** Relay inbound replay rejection must survive record purge/eviction and reboot while advancing only after a record is actually accepted/stored.
+- **What:** Loads, persists, rebuild-merges, and enforces per-origin relay replay floors, mapping floor hits to `RejectedByPolicy`; v1 metadata loads as epoch 0 and future writes persist v2 `(origin,maxEpoch,maxSequence)` entries.
+- **Why:** Relay inbound replay rejection must survive record purge/eviction and reboot while advancing only after a record is actually accepted/stored; higher officer epochs must be accepted even with lower sequence numbers so field recovery does not require manual relay erasure.
 - **Conflict risk:** Low - wrapper-owned relay DTN store logic.
 - **What:** Reused the object-owned replay-floor metadata scratch buffer in load and persist paths instead of allocating 4KB scratch arrays on the stack.
 - **Why:** ~4KB stack frames in the acceptance path were the most likely reboot vector on the 8KB ESP32 loop stack, so the metadata path now avoids that stack pressure.
@@ -173,6 +173,11 @@
 - **What:** At the per-origin record cap, a routine (non-SOS) GPS record now also reclaims a DELIVERED (`BoardBStored`) same-origin record (dropped the prior `!sos` gate on `evictDeliveredForOrigin`); undelivered/in-flight records stay protected (backpressure).
 - **Why:** Only SOS could reclaim before, so a sustained-GPS officer with no SOS saturated its 64-slot quota and every further record `cap_rejected` -- which stops UART export (only `Captured` records forward) and silently stalled the whole custody chain (hardware-confirmed 2026-06-16: relay `gps=147 disp=cap_rejected fwd=0`, Board B `UART bytes=0`). Preserves REQ:SR-4 delivered-trail/eviction-priority (store still bounded at the cap); does not shrink the store.
 - **Conflict risk:** Low - wrapper-owned relay DTN store acceptance logic.
+
+### src/selfcius/common/relay/selfcius_relay_processor.cpp
+- **What:** Sorts relay-parsed records by origin, epoch, then sequence before store admission.
+- **Why:** V2 epoch-bearing batches must process lower epochs before higher epochs for the same origin so replay-floor updates are deterministic.
+- **Conflict risk:** Low - wrapper-owned relay receive path.
 
 ### src/selfcius/common/dtn/selfcius_dtn_store.h
 - **What:** Exposed the last DTN backend append result through `DtnStore`

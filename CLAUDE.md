@@ -316,8 +316,8 @@
 - **Conflict risk:** Low - wrapper-owned relay-to-Board-B export driver.
 
 ### src/selfcius/relay_lorawan/src/main.cpp
-- **What:** Added compile-gated USB bench commands for clearing records, creating/checking `.dat.tmp` orphans, and printing GPS replacement proof, plus watchdog servicing during Board B rebuilds.
-- **Why:** Board B real-flash storage drills must be repeatable through reusable tooling and must prove payload-level replacement without enabling bench-only USB injection in production firmware.
+- **What:** Added compile-gated USB bench commands for clearing records, creating/checking `.dat.tmp` orphans, printing GPS replacement proof, and proving wrong-epoch vs exact-epoch ACK release, plus watchdog servicing during Board B rebuilds.
+- **Why:** Board B real-flash storage drills must be repeatable through reusable tooling and must prove payload-level replacement and epoch-aware custody ACK identity without enabling bench-only USB injection in production firmware.
 - **Conflict risk:** Low - standalone wrapper-owned Board B firmware, compile-gated for bench-only commands.
 - **What:** Marks LoRaWAN uplink-pending records using the full epoch-aware record key and includes epoch in Board B duplicate/superseded/conflict logs.
 - **Why:** Phase 5 backend ACK release and bench logs must distinguish generations with reused sequence numbers.

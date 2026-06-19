@@ -174,9 +174,9 @@
 - **Why:** Only SOS could reclaim before, so a sustained-GPS officer with no SOS saturated its 64-slot quota and every further record `cap_rejected` -- which stops UART export (only `Captured` records forward) and silently stalled the whole custody chain (hardware-confirmed 2026-06-16: relay `gps=147 disp=cap_rejected fwd=0`, Board B `UART bytes=0`). Preserves REQ:SR-4 delivered-trail/eviction-priority (store still bounded at the cap); does not shrink the store.
 - **Conflict risk:** Low - wrapper-owned relay DTN store acceptance logic.
 
-### src/selfcius/common/relay/selfcius_relay_processor.cpp
-- **What:** Sorts relay-parsed records by origin, epoch, then sequence before store admission.
-- **Why:** V2 epoch-bearing batches must process lower epochs before higher epochs for the same origin so replay-floor updates are deterministic.
+### src/selfcius/common/relay/selfcius_relay_processor.{h,cpp}
+- **What:** Sorts relay-parsed records by origin, epoch, then sequence before store admission, and accepts parser-only V2 LiveMesh GPS-position batches by converting them into the existing relay `GpsRecord` path.
+- **Why:** V2 epoch-bearing batches must process lower epochs before higher epochs for the same origin so replay-floor updates are deterministic; the relay needs parser support before officer V2 transmit, Board B, or backend export are enabled.
 - **Conflict risk:** Low - wrapper-owned relay receive path.
 
 ### src/selfcius/common/dtn/selfcius_dtn_store.h

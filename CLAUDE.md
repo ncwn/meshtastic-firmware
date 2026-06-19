@@ -288,16 +288,40 @@
 - **What:** Added a rebuild service hook and payload-level stored-key counting for Board B diagnostics.
 - **Why:** Full 512-record real-flash rebuild and latest-GPS replacement drills need watchdog-safe scans plus proof that the expected newer origin/sequence/hash is present and the older same-origin key is absent.
 - **Conflict risk:** Low - wrapper-owned Board B record store API.
+- **What:** Renamed the latest-GPS helper surface to generation-scoped `(originNodeId,originEpoch)` freshness checks.
+- **Why:** Board B must not drop or collapse a higher-epoch low-sequence record behind an older generation's high replay floor.
+- **Conflict risk:** Low - wrapper-owned Board B record store API.
 
 ### src/selfcius/relay_lorawan/board_b_store.cpp
 - **What:** Services the optional hook during rebuild/count scans and exposes `countStoredKey()` for payload-level replacement proof. Latest-GPS supersession now collapses only `Received` records: a newer same-origin GPS no longer replaces an in-flight `UplinkPending`/`Uplinked` record (drop-older still applies against in-flight via `latestSeqForOrigin`).
 - **Why:** Hardware drills showed long LittleFS scans can trip the watchdog, and count-only rebuild evidence cannot prove same-origin latest-GPS replacement. Superseding an in-flight record deleted it before its backend fingerprint ACK arrived, losing custody/audit of a record that had already been transmitted (audit F50).
 - **Conflict risk:** Low - wrapper-owned Board B record store implementation.
+- **What:** Made Board B exact ACK release and latest-GPS freshness use the full epoch-aware record key; rebuild collapse is now scoped per `(originNodeId,originEpoch)` generation.
+- **Why:** Phase 5 custody identity must survive relay->Board B->LoRaWAN without treating epoch 11 seq 17 as older than epoch 10 seq 960000.
+- **Conflict risk:** Low - wrapper-owned Board B record store implementation.
+
+### src/selfcius/proto/selfcius_uart_frame.{h,cpp}
+- **What:** Added `originEpoch` to relay-to-Board-B GPS batch records and kept the UART frame size bounded with a protocol static assert.
+- **Why:** Board B must receive the same epoch-aware custody identity the relay admitted before any backend/full-chain epoch rollout.
+- **Conflict risk:** Medium - wrapper-owned UART wire format between Board A and Board B; both sides must be flashed together.
+
+### src/selfcius/proto/selfcius_lorawan_payload.{h,cpp}
+- **What:** Added `originEpoch` to fPort1 GPS uplink records and fPort3 backend ACK records; reduced the proven 52-byte ACK cap to 3 records, DR0-DR2 uplink caps to 1 record, DR3/DR4 caps to 3 records, and DR5 cap to 7 records.
+- **Why:** Backend custody ACKs must exact-match `(originNodeId,originEpoch,originSequence,payloadHash)` and uplink batches must still fit AS923 payload budgets plus the local uplink buffer.
+- **Conflict risk:** Medium - wrapper-owned LoRaWAN/backend contract; coordinate with TTN decoder and backend ingest.
+
+### src/selfcius/relay_mesh/uart_bridge/selfcius_uart_export_driver.cpp
+- **What:** Tracks pending UART batch records by full `recordKeyFor(record)` instead of `(originNodeId,originSequence)`.
+- **Why:** Relay custody status updates after Board B ACK/NACK must apply to the exact epoch-bearing record.
+- **Conflict risk:** Low - wrapper-owned relay-to-Board-B export driver.
 
 ### src/selfcius/relay_lorawan/src/main.cpp
 - **What:** Added compile-gated USB bench commands for clearing records, creating/checking `.dat.tmp` orphans, and printing GPS replacement proof, plus watchdog servicing during Board B rebuilds.
 - **Why:** Board B real-flash storage drills must be repeatable through reusable tooling and must prove payload-level replacement without enabling bench-only USB injection in production firmware.
 - **Conflict risk:** Low - standalone wrapper-owned Board B firmware, compile-gated for bench-only commands.
+- **What:** Marks LoRaWAN uplink-pending records using the full epoch-aware record key and includes epoch in Board B duplicate/superseded/conflict logs.
+- **Why:** Phase 5 backend ACK release and bench logs must distinguish generations with reused sequence numbers.
+- **Conflict risk:** Low - standalone wrapper-owned Board B firmware.
 
 ### New Files
 

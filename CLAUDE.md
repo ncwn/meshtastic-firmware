@@ -14,7 +14,7 @@
 
 ## Nested Submodules
 
-- `protobufs`: `origin` = `ncwn/protobufs`, `upstream` = `meshtastic/protobufs`, branch `v4`, currently pinned at firmware-compatible commit `e30092e6168b13341c2b7ec4be19c789ad5cd77f` (`v2.7.21-6-ge30092e`).
+- `protobufs`: `origin` = `ncwn/protobufs`, `upstream` = `meshtastic/protobufs`, branch `v4`. The firmware pins the v4 fork commit (run `git submodule status protobufs` for the exact SHA); the v4 branch carries the SELFCIUS `admin.proto` additions on top of upstream `v2.7.21-6-ge30092e`.
 - `meshtestic`: upstream Meshtastic test fixture submodule, unchanged.
 
 ## Build
@@ -304,11 +304,11 @@ _None yet._
 ## Dependencies
 
 ### protobufs (nested submodule)
-- **Current policy:** Pin upstream `meshtastic/protobufs`; do not make protobuf changes part of initial v4 work.
-- **Rationale:** Initial DTN work can use existing Meshtastic payload surfaces. Proto changes require coordinated regeneration across firmware, android, and apple, so they should be introduced only when a concrete requirement needs them.
-- **Future trigger:** If v4 later needs custom mesh messages, port numbers, generated API fields, or shared protocol definitions that cannot fit cleanly in existing payloads, promote protobufs to a tracked v4 fork before landing the protocol change.
-- **Escalation path:** Execute the "Forking protobufs later" path in the wrapper repo, update `upstream-versions.json`, document app generation impact, and record all protobuf edits in this file.
-- **Action on upstream merge:** Accept upstream's protobufs pointer as-is unless a tracked v4 protobuf fork has been created.
+- **Current status:** FORK EXECUTED. `protobufs` now tracks `ncwn/protobufs` branch `v4` (the escalation path below was triggered by the SELFCIUS officer-epoch `admin.proto` addition). `upstream` remains `meshtastic/protobufs`.
+- **Rationale:** Initial DTN work used existing Meshtastic payload surfaces. Proto changes require coordinated regeneration across firmware, android, and apple, so they were introduced only when the epoch-provisioning admin message needed a dedicated payload.
+- **Regeneration:** After editing `protobufs/meshtastic/*.proto`, regenerate firmware bindings with `./bin/regen-protos.sh` (needs `nanopb-0.4.9/generator-bin/protoc`; the repo's prebuilt is Linux x86 — on other hosts provide a local nanopb generator) and commit the regenerated `src/mesh/generated/...` with the schema bump.
+- **Action on upstream merge:** Merge `upstream/v4`-relevant protobuf changes into `ncwn/protobufs` v4 (never rebase); keep the SELFCIUS `admin.proto` additions; regenerate and re-pin.
+- **Outstanding:** `upstream-versions.json` does not yet track the nested protobufs fork (it lists only the three top-level submodules); add nested tracking before relying on `scripts/upstream-sync.sh` for protobufs.
 
 ## SELFCIUS Dependency Tracking
 

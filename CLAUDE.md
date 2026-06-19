@@ -192,6 +192,11 @@
 - **Why:** Preserves the true LittleFS failure boundary for officer diagnostics instead of collapsing every append failure into the same opaque result
 - **Conflict risk:** Low - wrapper-owned DTN store logic
 
+### src/selfcius/common/dtn/selfcius_stored_record_codec.{h,cpp}
+- **What:** Bumped stored-record frames to `SDT3` by storing `originEpoch` beside the existing schema-1 GPS record body; older `SDT2`/`SDTN` frames still decode as epoch 0 and rewrite to current format.
+- **Why:** Relay/officer LittleFS persistence must preserve nonzero epoch identities before Board B/UART/backend export are fully epoch-aware; otherwise epoch-bearing records reach the relay but fail storage encode.
+- **Conflict risk:** Medium - on-flash SELFCIUS record format with compatibility migration.
+
 ### src/selfcius/common/dtn/selfcius_littlefs_storage.h
 - **What:** Added typed LittleFS append failure reasons
 - **Why:** Officer validation needs to tell apart full-storage, no-free-slot, encode, open, and short-write failures without destructive probing

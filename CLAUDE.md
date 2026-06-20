@@ -249,6 +249,11 @@
 - **Why:** Every officer-originated custody record must carry the persisted generation before V2 transmit and epoch-aware replay floors are enabled.
 - **Conflict risk:** Low - wrapper-owned officer GPS capture path with native coverage.
 
+### src/selfcius/officer/mesh/selfcius_mesh_transport.cpp
+- **What:** Encodes officer live mesh batches with the existing V2 LiveMesh packet when any selected GPS record has a nonzero origin epoch; epoch-0 records continue using legacy schema-1 encoding.
+- **Why:** Protocol-level replay-floor recovery requires bumped-epoch officers to transmit epoch-bearing records instead of failing legacy schema-1 encode and staying silent.
+- **Conflict risk:** Medium - changes the officer live mesh wire path for nonzero-epoch records while preserving epoch-0 compatibility.
+
 ### src/selfcius/officer/selfcius_officer_module.cpp
 - **What:** Expanded officer DTN store failure logs to include symbolic store-result names, LittleFS append failure reasons, and current stored-record count
 - **Why:** Hardware validation on Officer D218 showed `store_result=5` but not the concrete storage boundary that caused it

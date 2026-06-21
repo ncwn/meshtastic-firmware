@@ -12,6 +12,11 @@
 - **Upstream repo:** meshtastic/firmware
 - **Fork repo:** ncwn/meshtastic-firmware
 
+## Nested Submodules
+
+- `protobufs`: `origin` = `ncwn/protobufs`, `upstream` = `meshtastic/protobufs`, branch `v4`. The firmware pins the v4 fork commit (run `git submodule status protobufs` for the exact SHA); the v4 branch carries the SELFCIUS `admin.proto` additions on top of upstream `v2.7.21-6-ge30092e`.
+- `meshtestic`: upstream Meshtastic test fixture submodule, unchanged.
+
 ## Build
 
 - PlatformIO-based — see `platformio.ini` for targets
@@ -54,6 +59,11 @@
 - **Conflict risk:** Low / Medium / High when merging upstream
 -->
 
+### .gitmodules
+- **What:** Repointed the nested `protobufs` submodule to `ncwn/protobufs` with branch `v4`, while keeping `upstream` as `meshtastic/protobufs` in the local checkout.
+- **Why:** SELFCIUS epoch provisioning requires a deliberate protobuf fork path before changing `admin.proto`, matching the v4 fork workflow used by the other Meshtastic submodules.
+- **Conflict risk:** Medium - protobuf upstream syncs and generated-code changes must coordinate with the pinned nested submodule commit.
+
 ### .gitignore
 - **What:** Added ignores for the SELFCIUS generated PlatformIO overlay symlinks: `/platformio_override.ini`, `/variants/selfcius/`, and `/src/selfcius/`
 - **Why:** The wrapper repo creates these symlinks from `build/setup.sh` so SELFCIUS build environments and sources can load without committing wrapper-local paths into the public firmware fork
@@ -68,6 +78,11 @@
 - **What:** Guarded the OTA admin request path so it only uses `MeshtasticOTA` when WiFi is enabled, and returns a warning instead of rebooting on unsupported builds
 - **Why:** SELFCIUS trims WiFi for ESP32 officer/relay builds. Without this guard, `AdminModule` references OTA symbols that are not compiled in and breaks the build.
 - **Conflict risk:** Medium - upstream OTA/admin changes could touch the same switch case
+
+### src/mesh/generated/meshtastic/admin.pb.{h,cpp}
+- **What:** Regenerated nanopb admin bindings after adding the `SelfciusEpoch` admin payload in the nested protobufs submodule.
+- **Why:** Officer firmware needs a typed admin request/response surface to read or set the SELFCIUS origin epoch without overloading unrelated Meshtastic admin fields.
+- **Conflict risk:** Medium - generated admin bindings must stay in lock-step with `protobufs/meshtastic/admin.proto`.
 
 ### src/mesh/PhoneAPI.cpp
 - **What:** Skipped the recursive filesystem manifest scan for `SPECIAL_NONCE_ONLY_NODES` BLE config requests.
@@ -122,8 +137,8 @@
 - **What:** Added `SELFCIUS_RELAY_ALLOWLIST_ENABLED`, defaulting to `0`, with a 0/1 static assertion for compile-time lab allowlist overrides.
 - **Why:** ADR-009 admission now relies on channel-key membership; the per-node relay allowlist must default open in firmware source while remaining available as explicit lab defense-in-depth.
 - **Conflict risk:** Low - wrapper-owned SELFCIUS config header.
-- **What:** Added relay replay-floor and DTN metadata cap constants.
-- **Why:** Stage-1 increment 4 needs a bounded persistent per-origin monotonic floor table for replay rejection that survives relay record eviction and reboot.
+- **What:** Added relay replay-floor and DTN metadata cap constants; increased the metadata scratch cap to fit v2 epoch-aware replay-floor entries.
+- **Why:** Stage-1 increment 4 needs a bounded persistent per-origin monotonic floor table for replay rejection that survives relay record eviction and reboot; the officer-epoch recovery path stores `(originNodeId,maxEpoch,maxSequence)` per floor.
 - **Conflict risk:** Low - wrapper-owned SELFCIUS config header.
 - **What:** Wrapped the three peer-SOS carry timing constants (`SELFCIUS_DTN_PEER_SOS_CARRY_MIN_INTERVAL_MS`, `SELFCIUS_DTN_PEER_SOS_CARRY_MAX_INTERVAL_MS`, and `SELFCIUS_DTN_PEER_SOS_PRESSURE_DEFER_MS`) in `#ifndef` guards, with defaults unchanged.
 - **Why:** G2 carry-forward bench needs compressed timing overrides while production keeps shipping values.
@@ -138,16 +153,19 @@
 - **Conflict risk:** Low - wrapper-owned DTN backend interface used only by SELFCIUS storage implementations
 
 ### src/selfcius/common/dtn/selfcius_relay_dtn_store.h
-- **What:** Added in-memory per-origin replay-floor state for relay-observed records.
-- **Why:** Stage-1 increment 4 requires relay inbound monotonic sequence floors to reject equal/lower origin sequences per origin.
+- **What:** Added in-memory per-origin replay-floor state for relay-observed records; floor entries now track max accepted epoch plus max accepted sequence.
+- **Why:** Stage-1 increment 4 requires relay inbound monotonic sequence floors to reject equal/lower origin sequences per origin, and the officer-epoch recovery path needs a higher epoch to reset the sequence floor without clearing relay storage.
 - **Conflict risk:** Low - wrapper-owned relay DTN store surface.
 - **What:** Moved the relay replay-floor metadata scratch buffer onto `RelayDtnStore` instead of using per-call stack arrays.
 - **Why:** ~4KB stack frames in the acceptance path were the most likely reboot vector on the 8KB ESP32 loop stack, so the scratch buffer now lives on the heap-backed relay store object.
 - **Conflict risk:** Low - wrapper-owned relay DTN store surface.
+- **What:** Added a per-record relay policy-reject cause surface (`invalid_record` vs `replay_floor`) to the relay store/trace path.
+- **Why:** Field diagnostics must distinguish no-valid-fix records from stale replay-floor lockout before protocol-level epoch work.
+- **Conflict risk:** Low - wrapper-owned relay DTN store surface.
 
 ### src/selfcius/common/dtn/selfcius_relay_dtn_store.cpp
-- **What:** Loads, persists, rebuild-merges, and enforces per-origin relay replay floors, mapping floor hits to `RejectedByPolicy`.
-- **Why:** Relay inbound replay rejection must survive record purge/eviction and reboot while advancing only after a record is actually accepted/stored.
+- **What:** Loads, persists, rebuild-merges, and enforces per-origin relay replay floors, mapping floor hits to `RejectedByPolicy`; v1 metadata loads as epoch 0 and future writes persist v2 `(origin,maxEpoch,maxSequence)` entries.
+- **Why:** Relay inbound replay rejection must survive record purge/eviction and reboot while advancing only after a record is actually accepted/stored; higher officer epochs must be accepted even with lower sequence numbers so field recovery does not require manual relay erasure.
 - **Conflict risk:** Low - wrapper-owned relay DTN store logic.
 - **What:** Reused the object-owned replay-floor metadata scratch buffer in load and persist paths instead of allocating 4KB scratch arrays on the stack.
 - **Why:** ~4KB stack frames in the acceptance path were the most likely reboot vector on the 8KB ESP32 loop stack, so the metadata path now avoids that stack pressure.
@@ -155,6 +173,11 @@
 - **What:** At the per-origin record cap, a routine (non-SOS) GPS record now also reclaims a DELIVERED (`BoardBStored`) same-origin record (dropped the prior `!sos` gate on `evictDeliveredForOrigin`); undelivered/in-flight records stay protected (backpressure).
 - **Why:** Only SOS could reclaim before, so a sustained-GPS officer with no SOS saturated its 64-slot quota and every further record `cap_rejected` -- which stops UART export (only `Captured` records forward) and silently stalled the whole custody chain (hardware-confirmed 2026-06-16: relay `gps=147 disp=cap_rejected fwd=0`, Board B `UART bytes=0`). Preserves REQ:SR-4 delivered-trail/eviction-priority (store still bounded at the cap); does not shrink the store.
 - **Conflict risk:** Low - wrapper-owned relay DTN store acceptance logic.
+
+### src/selfcius/common/relay/selfcius_relay_processor.{h,cpp}
+- **What:** Sorts relay-parsed records by origin, epoch, then sequence before store admission, and accepts parser-only V2 LiveMesh GPS-position batches by converting them into the existing relay `GpsRecord` path.
+- **Why:** V2 epoch-bearing batches must process lower epochs before higher epochs for the same origin so replay-floor updates are deterministic; the relay needs parser support before officer V2 transmit, Board B, or backend export are enabled.
+- **Conflict risk:** Low - wrapper-owned relay receive path.
 
 ### src/selfcius/common/dtn/selfcius_dtn_store.h
 - **What:** Exposed the last DTN backend append result through `DtnStore`
@@ -168,6 +191,11 @@
 - **What:** Captured backend append failure reasons when `storage.append()` fails
 - **Why:** Preserves the true LittleFS failure boundary for officer diagnostics instead of collapsing every append failure into the same opaque result
 - **Conflict risk:** Low - wrapper-owned DTN store logic
+
+### src/selfcius/common/dtn/selfcius_stored_record_codec.{h,cpp}
+- **What:** Bumped stored-record frames to `SDT3` by storing `originEpoch` beside the existing schema-1 GPS record body; older `SDT2`/`SDTN` frames still decode as epoch 0 and rewrite to current format.
+- **Why:** Relay/officer LittleFS persistence must preserve nonzero epoch identities before Board B/UART/backend export are fully epoch-aware; otherwise epoch-bearing records reach the relay but fail storage encode.
+- **Conflict risk:** Medium - on-flash SELFCIUS record format with compatibility migration.
 
 ### src/selfcius/common/dtn/selfcius_littlefs_storage.h
 - **What:** Added typed LittleFS append failure reasons
@@ -201,6 +229,31 @@
 - **Why:** Relay replay-floor tests need metadata to survive record purge and store reconstruction in the native environment.
 - **Conflict risk:** Low - wrapper-owned native test backend
 
+### src/selfcius/common/protocol/selfcius_dtn_packet.{h,cpp}
+- **What:** Added `originEpoch` to the in-memory GPS record/key model while keeping schema-1 GPS batches wire-compatible; schema-1 parse maps epoch to `0`, and schema-1 encode rejects nonzero epochs.
+- **Why:** Epoch must become part of custody identity without silently transmitting a nonzero epoch through the legacy 27-byte packet format.
+- **Conflict risk:** Medium - shared SELFCIUS DTN identity surface used by officer, relay, Board B, and tests.
+
+### src/selfcius/common/protocol/selfcius_v2_packet.{h,cpp}
+- **What:** Added `originEpoch` to the existing disabled V2 record envelope and V2 canonical hash, restricted the legacy V1-compatible GPS hash scheme to epoch `0`, and updated V2 GPS batch capacity from 6 to 5 records.
+- **Why:** Protocol-level replay-floor recovery needs epoch in the V2 identity/hash before V2 transmit is enabled; keeping `SELFCIUS_DTN_V2_TRANSMIT_ENABLED=0` preserves parser-first rollout.
+- **Conflict risk:** Medium - disabled V2 protocol wire layout changed intentionally; coordinate with any future V2 transmit rollout.
+
+### src/selfcius/officer/selfcius_sequence_floor.h, src/selfcius/officer/selfcius_sequence_state.h
+- **What:** Added durable `originEpoch` beside the officer sequence floor, defaulting legacy floor-only state to epoch `0` and preserving epoch when reserving future sequence floors.
+- **Why:** Replay-floor recovery needs a stable officer generation value that survives normal firmware reflashes and is stamped independently from the monotonic sequence counter.
+- **Conflict risk:** Medium - shared officer custody identity state; coordinate with provisioning and relay replay-floor rollout.
+
+### src/selfcius/officer/gps/selfcius_gps_sampler.{h,cpp}
+- **What:** Threaded `originEpoch` through GPS sample input and stamped it onto valid-fix, stale-SOS, and no-lock SOS records.
+- **Why:** Every officer-originated custody record must carry the persisted generation before V2 transmit and epoch-aware replay floors are enabled.
+- **Conflict risk:** Low - wrapper-owned officer GPS capture path with native coverage.
+
+### src/selfcius/officer/mesh/selfcius_mesh_transport.cpp
+- **What:** Encodes officer live mesh batches with the existing V2 LiveMesh packet when any selected GPS record has a nonzero origin epoch; epoch-0 records continue using legacy schema-1 encoding.
+- **Why:** Protocol-level replay-floor recovery requires bumped-epoch officers to transmit epoch-bearing records instead of failing legacy schema-1 encode and staying silent.
+- **Conflict risk:** Medium - changes the officer live mesh wire path for nonzero-epoch records while preserving epoch-0 compatibility.
+
 ### src/selfcius/officer/selfcius_officer_module.cpp
 - **What:** Expanded officer DTN store failure logs to include symbolic store-result names, LittleFS append failure reasons, and current stored-record count
 - **Why:** Hardware validation on Officer D218 showed `store_result=5` but not the concrete storage boundary that caused it
@@ -214,6 +267,14 @@
 - **What:** Logs a coordinate-free DTN snapshot after officer storage rebuild, including aggregate counts and per-origin suffix/sequence ranges.
 - **Why:** Field-check evidence needs a durable post-run readback path; serial reconnects reboot the board, so the boot log must expose LittleFS-backed state after rebuild.
 - **Conflict risk:** Low - wrapper-owned officer diagnostics only.
+- **What:** Handles the SELFCIUS admin epoch request/response, allowing local admin clients to read or set the persisted `originEpoch` and read the reserved sequence floor.
+- **Why:** Factory reset/reprovision must explicitly set an officer generation instead of relying on a local counter erased by reset.
+- **Conflict risk:** Medium - wrapper-owned officer module, but depends on the generated admin protobuf surface.
+
+### src/selfcius/common/relay/selfcius_relay_log_format.{h,cpp}
+- **What:** Relay per-record logs now append `policy_reason=<none|invalid_record|replay_floor>` with native totality/format tests and summarizer token binding.
+- **Why:** Bench/field log analysis needs to classify `policy_rejected` records without destructive relay-floor resets.
+- **Conflict risk:** Low - wrapper-owned SELFCIUS log contract.
 
 ### src/selfcius/relay_mesh/selfcius_relay_module.cpp
 - **What:** Passes an explicit `RelayAdmissionConfig` using `SELFCIUS_DTN_PRIVATE_CHANNEL_INDEX`, `SELFCIUS_RELAY_ALLOWLIST_ENABLED != 0`, and forwarded SOS disabled.
@@ -227,21 +288,54 @@
 - **What:** Normalized the RadioLib ABP session RX timing to the custom TTS network's 5-second RX1 / 6-second RX2 schedule after session restore or activation.
 - **Why:** Hardware E2E on `ttn.hazemon.in.th` showed backend ACK downlinks were being scheduled around 5 seconds after uplink while Board B was opening an earlier RX window, causing custody records to remain unreleased despite backend ACK queueing.
 - **Conflict risk:** Low - wrapper-owned Board B LoRaWAN driver, but revisit if RadioLib session-buffer offsets change.
+- **What:** Reworked the ABP downlink path for the TTS `MAC_V1_0_3` reprovision: re-pin a fixed datarate (`setADR(false)+setDatarate(LORAWAN_DR)`) at the top of every uplink so a network `LinkADRReq` cannot drag this fixed-rate device to a dwell-invalid DR, and zero the confirmed-downlink counter to the `0xFF` sentinel on session restore to suppress a spurious `FCTRL_ACK` on the first post-reboot uplink (documented 16-bit `AFCntDown` rollover ceiling). The RX1/RX2 normalization above is retained; the earlier debug-only `rxDelays[]+=offset` / `scanGuard=800` GODMODE pokes were dropped (they broke the clean production build) → RadioLib defaults.
+- **Why:** Resolved the long-open production fPort3 ACK blocker — TTS `MAC_V1_0_4` split downlink counters (NFCntDown vs AFCntDown) break RadioLib 7.6.0's rev-0 single-counter MIC check (false FCnt rollover → `RADIOLIB_ERR_MIC_MISMATCH -1112`); the 1.0.3 reprovision + DR re-pin + counter-reset fix it with no protocol change. HW full chain proven (`6674:1:1325`, `released=1`).
+- **Conflict risk:** Low - wrapper-owned Board B LoRaWAN driver; revisit on RadioLib session-buffer or MAC-version changes.
 
 ### src/selfcius/relay_lorawan/board_b_store.h
 - **What:** Added a rebuild service hook and payload-level stored-key counting for Board B diagnostics.
 - **Why:** Full 512-record real-flash rebuild and latest-GPS replacement drills need watchdog-safe scans plus proof that the expected newer origin/sequence/hash is present and the older same-origin key is absent.
 - **Conflict risk:** Low - wrapper-owned Board B record store API.
+- **What:** Renamed the latest-GPS helper surface to generation-scoped `(originNodeId,originEpoch)` freshness checks.
+- **Why:** Board B must not drop or collapse a higher-epoch low-sequence record behind an older generation's high replay floor.
+- **Conflict risk:** Low - wrapper-owned Board B record store API.
+- **What:** Added the on-disk-only `ReceivedUplinked` status (enum value 4) and documented the `everUplinked` field as rebuild-restored, not RAM-default.
+- **Why:** `everUplinked` (the "was transmitted" flag gating backend-ACK release) was RAM-only, so a transmitted-then-stale-requeued record came back from a reboot as not-releasable and its queued fPort3 ACK was ignored — stranding custody (GPS self-heals via latest-GPS supersession; SOS does not). Persisting it via `ReceivedUplinked` lets `rebuildIndex` restore `everUplinked=true` across a reboot. The struct stays a pure aggregate (no default member initializer — the xtensa toolchain rejects it at the brace-init sites).
+- **Conflict risk:** Medium - persistent on-disk status semantics; old stores (status 0-3) migrate cleanly, a firmware rollback strands status-4 records as inert (no false release).
 
 ### src/selfcius/relay_lorawan/board_b_store.cpp
 - **What:** Services the optional hook during rebuild/count scans and exposes `countStoredKey()` for payload-level replacement proof. Latest-GPS supersession now collapses only `Received` records: a newer same-origin GPS no longer replaces an in-flight `UplinkPending`/`Uplinked` record (drop-older still applies against in-flight via `latestSeqForOrigin`).
 - **Why:** Hardware drills showed long LittleFS scans can trip the watchdog, and count-only rebuild evidence cannot prove same-origin latest-GPS replacement. Superseding an in-flight record deleted it before its backend fingerprint ACK arrived, losing custody/audit of a record that had already been transmitted (audit F50).
 - **Conflict risk:** Low - wrapper-owned Board B record store implementation.
+- **What:** Made Board B exact ACK release and latest-GPS freshness use the full epoch-aware record key; rebuild collapse is now scoped per `(originNodeId,originEpoch)` generation.
+- **Why:** Phase 5 custody identity must survive relay->Board B->LoRaWAN without treating epoch 11 seq 17 as older than epoch 10 seq 960000.
+- **Conflict risk:** Low - wrapper-owned Board B record store implementation.
+- **What:** `requeueStaleUplinkPending` now persists `ReceivedUplinked` (keeping RAM `status=Received` + `everUplinked=true`), and `rebuildIndex` restores `everUplinked=true` for both persisted `UplinkPending` and `ReceivedUplinked` (both only ever mean "transmitted" in production), while plain `Received` stays false (the safe direction).
+- **Why:** Makes the backend-ACK release survive a reboot for an in-flight or stale-requeued record without ever releasing a never-transmitted record. Native 485/485 incl. three reboot pins (uplinkpending/requeued release=1, never-uplinked release=0); HW-proven (`released=1` vs the pre-fix `released=0 ignored=1`).
+- **Conflict risk:** Medium - wrapper-owned Board B record store implementation; pairs with the board_b_store.h on-disk status change.
+
+### src/selfcius/proto/selfcius_uart_frame.{h,cpp}
+- **What:** Added `originEpoch` to relay-to-Board-B GPS batch records and kept the UART frame size bounded with a protocol static assert.
+- **Why:** Board B must receive the same epoch-aware custody identity the relay admitted before any backend/full-chain epoch rollout.
+- **Conflict risk:** Medium - wrapper-owned UART wire format between Board A and Board B; both sides must be flashed together.
+
+### src/selfcius/proto/selfcius_lorawan_payload.{h,cpp}
+- **What:** Added `originEpoch` to fPort1 GPS uplink records and fPort3 backend ACK records; reduced the proven 52-byte ACK cap to 3 records, DR0-DR2 uplink caps to 1 record, DR3/DR4 caps to 3 records, and DR5 cap to 7 records.
+- **Why:** Backend custody ACKs must exact-match `(originNodeId,originEpoch,originSequence,payloadHash)` and uplink batches must still fit AS923 payload budgets plus the local uplink buffer.
+- **Conflict risk:** Medium - wrapper-owned LoRaWAN/backend contract; coordinate with TTN decoder and backend ingest.
+
+### src/selfcius/relay_mesh/uart_bridge/selfcius_uart_export_driver.cpp
+- **What:** Tracks pending UART batch records by full `recordKeyFor(record)` instead of `(originNodeId,originSequence)`.
+- **Why:** Relay custody status updates after Board B ACK/NACK must apply to the exact epoch-bearing record.
+- **Conflict risk:** Low - wrapper-owned relay-to-Board-B export driver.
 
 ### src/selfcius/relay_lorawan/src/main.cpp
-- **What:** Added compile-gated USB bench commands for clearing records, creating/checking `.dat.tmp` orphans, and printing GPS replacement proof, plus watchdog servicing during Board B rebuilds.
-- **Why:** Board B real-flash storage drills must be repeatable through reusable tooling and must prove payload-level replacement without enabling bench-only USB injection in production firmware.
+- **What:** Added compile-gated USB bench commands for clearing records, creating/checking `.dat.tmp` orphans, printing GPS replacement proof, and proving wrong-epoch vs exact-epoch ACK release, plus watchdog servicing during Board B rebuilds.
+- **Why:** Board B real-flash storage drills must be repeatable through reusable tooling and must prove payload-level replacement and epoch-aware custody ACK identity without enabling bench-only USB injection in production firmware.
 - **Conflict risk:** Low - standalone wrapper-owned Board B firmware, compile-gated for bench-only commands.
+- **What:** Marks LoRaWAN uplink-pending records using the full epoch-aware record key and includes epoch in Board B duplicate/superseded/conflict logs.
+- **Why:** Phase 5 backend ACK release and bench logs must distinguish generations with reused sequence numbers.
+- **Conflict risk:** Low - standalone wrapper-owned Board B firmware.
 
 ### New Files
 
@@ -258,11 +352,11 @@ _None yet._
 ## Dependencies
 
 ### protobufs (nested submodule)
-- **Current policy:** Pin upstream `meshtastic/protobufs`; do not make protobuf changes part of initial v4 work.
-- **Rationale:** Initial DTN work can use existing Meshtastic payload surfaces. Proto changes require coordinated regeneration across firmware, android, and apple, so they should be introduced only when a concrete requirement needs them.
-- **Future trigger:** If v4 later needs custom mesh messages, port numbers, generated API fields, or shared protocol definitions that cannot fit cleanly in existing payloads, promote protobufs to a tracked v4 fork before landing the protocol change.
-- **Escalation path:** Execute the "Forking protobufs later" path in the wrapper repo, update `upstream-versions.json`, document app generation impact, and record all protobuf edits in this file.
-- **Action on upstream merge:** Accept upstream's protobufs pointer as-is unless a tracked v4 protobuf fork has been created.
+- **Current status:** FORK EXECUTED. `protobufs` now tracks `ncwn/protobufs` branch `v4` (the escalation path below was triggered by the SELFCIUS officer-epoch `admin.proto` addition). `upstream` remains `meshtastic/protobufs`.
+- **Rationale:** Initial DTN work used existing Meshtastic payload surfaces. Proto changes require coordinated regeneration across firmware, android, and apple, so they were introduced only when the epoch-provisioning admin message needed a dedicated payload.
+- **Regeneration:** After editing `protobufs/meshtastic/*.proto`, regenerate firmware bindings with `./bin/regen-protos.sh` (needs `nanopb-0.4.9/generator-bin/protoc`; the repo's prebuilt is Linux x86 — on other hosts provide a local nanopb generator) and commit the regenerated `src/mesh/generated/...` with the schema bump.
+- **Action on upstream merge:** Merge `upstream/v4`-relevant protobuf changes into `ncwn/protobufs` v4 (never rebase); keep the SELFCIUS `admin.proto` additions; regenerate and re-pin.
+- **Outstanding:** `upstream-versions.json` does not yet track the nested protobufs fork (it lists only the three top-level submodules); add nested tracking before relying on `scripts/upstream-sync.sh` for protobufs.
 
 ## SELFCIUS Dependency Tracking
 

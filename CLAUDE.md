@@ -288,6 +288,9 @@
 - **What:** Normalized the RadioLib ABP session RX timing to the custom TTS network's 5-second RX1 / 6-second RX2 schedule after session restore or activation.
 - **Why:** Hardware E2E on `ttn.hazemon.in.th` showed backend ACK downlinks were being scheduled around 5 seconds after uplink while Board B was opening an earlier RX window, causing custody records to remain unreleased despite backend ACK queueing.
 - **Conflict risk:** Low - wrapper-owned Board B LoRaWAN driver, but revisit if RadioLib session-buffer offsets change.
+- **What:** Reworked the ABP downlink path for the TTS `MAC_V1_0_3` reprovision: re-pin a fixed datarate (`setADR(false)+setDatarate(LORAWAN_DR)`) at the top of every uplink so a network `LinkADRReq` cannot drag this fixed-rate device to a dwell-invalid DR, and zero the confirmed-downlink counter to the `0xFF` sentinel on session restore to suppress a spurious `FCTRL_ACK` on the first post-reboot uplink (documented 16-bit `AFCntDown` rollover ceiling). The RX1/RX2 normalization above is retained; the earlier debug-only `rxDelays[]+=offset` / `scanGuard=800` GODMODE pokes were dropped (they broke the clean production build) → RadioLib defaults.
+- **Why:** Resolved the long-open production fPort3 ACK blocker — TTS `MAC_V1_0_4` split downlink counters (NFCntDown vs AFCntDown) break RadioLib 7.6.0's rev-0 single-counter MIC check (false FCnt rollover → `RADIOLIB_ERR_MIC_MISMATCH -1112`); the 1.0.3 reprovision + DR re-pin + counter-reset fix it with no protocol change. HW full chain proven (`6674:1:1325`, `released=1`).
+- **Conflict risk:** Low - wrapper-owned Board B LoRaWAN driver; revisit on RadioLib session-buffer or MAC-version changes.
 
 ### src/selfcius/relay_lorawan/board_b_store.h
 - **What:** Added a rebuild service hook and payload-level stored-key counting for Board B diagnostics.
@@ -296,6 +299,9 @@
 - **What:** Renamed the latest-GPS helper surface to generation-scoped `(originNodeId,originEpoch)` freshness checks.
 - **Why:** Board B must not drop or collapse a higher-epoch low-sequence record behind an older generation's high replay floor.
 - **Conflict risk:** Low - wrapper-owned Board B record store API.
+- **What:** Added the on-disk-only `ReceivedUplinked` status (enum value 4) and documented the `everUplinked` field as rebuild-restored, not RAM-default.
+- **Why:** `everUplinked` (the "was transmitted" flag gating backend-ACK release) was RAM-only, so a transmitted-then-stale-requeued record came back from a reboot as not-releasable and its queued fPort3 ACK was ignored — stranding custody (GPS self-heals via latest-GPS supersession; SOS does not). Persisting it via `ReceivedUplinked` lets `rebuildIndex` restore `everUplinked=true` across a reboot. The struct stays a pure aggregate (no default member initializer — the xtensa toolchain rejects it at the brace-init sites).
+- **Conflict risk:** Medium - persistent on-disk status semantics; old stores (status 0-3) migrate cleanly, a firmware rollback strands status-4 records as inert (no false release).
 
 ### src/selfcius/relay_lorawan/board_b_store.cpp
 - **What:** Services the optional hook during rebuild/count scans and exposes `countStoredKey()` for payload-level replacement proof. Latest-GPS supersession now collapses only `Received` records: a newer same-origin GPS no longer replaces an in-flight `UplinkPending`/`Uplinked` record (drop-older still applies against in-flight via `latestSeqForOrigin`).
@@ -304,6 +310,9 @@
 - **What:** Made Board B exact ACK release and latest-GPS freshness use the full epoch-aware record key; rebuild collapse is now scoped per `(originNodeId,originEpoch)` generation.
 - **Why:** Phase 5 custody identity must survive relay->Board B->LoRaWAN without treating epoch 11 seq 17 as older than epoch 10 seq 960000.
 - **Conflict risk:** Low - wrapper-owned Board B record store implementation.
+- **What:** `requeueStaleUplinkPending` now persists `ReceivedUplinked` (keeping RAM `status=Received` + `everUplinked=true`), and `rebuildIndex` restores `everUplinked=true` for both persisted `UplinkPending` and `ReceivedUplinked` (both only ever mean "transmitted" in production), while plain `Received` stays false (the safe direction).
+- **Why:** Makes the backend-ACK release survive a reboot for an in-flight or stale-requeued record without ever releasing a never-transmitted record. Native 485/485 incl. three reboot pins (uplinkpending/requeued release=1, never-uplinked release=0); HW-proven (`released=1` vs the pre-fix `released=0 ignored=1`).
+- **Conflict risk:** Medium - wrapper-owned Board B record store implementation; pairs with the board_b_store.h on-disk status change.
 
 ### src/selfcius/proto/selfcius_uart_frame.{h,cpp}
 - **What:** Added `originEpoch` to relay-to-Board-B GPS batch records and kept the UART frame size bounded with a protocol static assert.

@@ -287,7 +287,10 @@
 - **Why:** Prevents default-open live admission records from being purged on reboot by a stale hardcoded allowlist, surfaces lab/public-channel builds at boot, and makes replay-floor table exhaustion visible as a distinct in-memory audit counter.
 - **Conflict risk:** Low - wrapper-owned relay overlay and SELFCIUS store/audit logic.
 
-### src/selfcius/relay_lorawan/lorawan_driver.cpp
+### src/selfcius/relay_lorawan/lorawan_driver.{h,cpp}
+- **What:** Added a standalone Heltec V4 Board B LoRaWAN radio path: compile-time V4 env flag, V4 FEM pin initialization/detection, RadioLib DIO2 RF-switch enable, and conservative SX1262 input-power gating while preserving the V3 default power path.
+- **Why:** Board B is standalone firmware and cannot inherit Meshtastic's `HAS_LORA_FEM` handling; V4 LoRaWAN must not transmit unadjusted 22 dBm into the external FEM.
+- **Conflict risk:** Medium - RadioLib/SX1262/FEM bring-up and regulatory-power assumptions must be rechecked if upstream Heltec V4 or RadioLib APIs change.
 - **What:** Normalized the RadioLib ABP session RX timing to the custom TTS network's 5-second RX1 / 6-second RX2 schedule after session restore or activation.
 - **Why:** Hardware E2E on `ttn.hazemon.in.th` showed backend ACK downlinks were being scheduled around 5 seconds after uplink while Board B was opening an earlier RX window, causing custody records to remain unreleased despite backend ACK queueing.
 - **Conflict risk:** Low - wrapper-owned Board B LoRaWAN driver, but revisit if RadioLib session-buffer offsets change.

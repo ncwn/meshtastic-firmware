@@ -103,8 +103,8 @@
 - **What:** Added env:selfcius-officer-v4 (extends env:heltec-v4) for the Heltec V4 officer role; reuses the officer -D flags + build_src_filter, inherits V4 16MB partitions + FEM handling.
 - **Why:** Defines wrapper-owned SELFCIUS PlatformIO environments without changing stock Meshtastic build targets.
 - **Conflict risk:** Low - wrapper-owned overlay configuration loaded only by the SELFCIUS symlink setup
-- **What:** Added env:selfcius-relay-mesh-v4 (extends env:heltec-v4) for a Heltec V4 Board-A relay UART bench path, overriding only the relay UART pins to GPIO26/33 while leaving the V3 relay env on GPIO6/7.
-- **Why:** Heltec V4 reserves the legacy V3 relay UART pins for FEM/board functions; the V4 relay bench needs a board-specific env without changing V3 defaults.
+- **What:** Added env:selfcius-relay-mesh-v4 (extends env:heltec-v4) for a Heltec V4 Board-A relay UART bench path, overriding only the relay UART pins to GPIO48/47 and excluding Meshtastic GPS while leaving the V3 relay env on GPIO6/7.
+- **Why:** Heltec V4 reserves the legacy V3 relay UART pins for FEM/board functions; GPIO26 is also unsafe on ESP32-S3 flash/PSRAM designs, so the V4 relay bench needs a board-specific env without changing V3 defaults.
 - **Conflict risk:** Low - wrapper-owned overlay configuration loaded only by the SELFCIUS symlink setup
 
 ### CLAUDE.md

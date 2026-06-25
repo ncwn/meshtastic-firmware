@@ -256,6 +256,9 @@
 - **What:** Encodes officer live mesh batches with the existing V2 LiveMesh packet when any selected GPS record has a nonzero origin epoch; epoch-0 records continue using legacy schema-1 encoding.
 - **Why:** Protocol-level replay-floor recovery requires bumped-epoch officers to transmit epoch-bearing records instead of failing legacy schema-1 encode and staying silent.
 - **Conflict risk:** Medium - changes the officer live mesh wire path for nonzero-epoch records while preserving epoch-0 compatibility.
+- **What:** Added a shared carry-forward queued-marker helper that parses V2 LiveMesh carry batches before spending the peer-SOS carry budget.
+- **Why:** Epoch-bearing peer SOS carry-forward batches encode as V2; marking them with the schema-1 parser left the N-time budget unspent and allowed repeated old SOS rebroadcasts.
+- **Conflict risk:** Low - wrapper-owned officer carry-forward helper.
 
 ### src/selfcius/officer/selfcius_officer_module.cpp
 - **What:** Expanded officer DTN store failure logs to include symbolic store-result names, LittleFS append failure reasons, and current stored-record count

@@ -1,4 +1,4 @@
-# meshtastic-firmware (v4 fork)
+# meshtastic-firmware (SELFCIUS fork)
 
 > This is a fork of `meshtastic/firmware` on the `selfcius/main` branch.
 > When merging upstream releases, consult the V4 Modifications section

@@ -1,7 +1,7 @@
 [submodule "protobufs"]
 	path = protobufs
 	url = https://github.com/ncwn/protobufs.git
-	branch = v4
+	branch = selfcius/main
 [submodule "meshtestic"]
 	path = meshtestic
 	url = https://github.com/meshtastic/meshTestic

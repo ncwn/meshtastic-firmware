@@ -1,6 +1,6 @@
 # meshtastic-firmware (v4 fork)
 
-> This is a fork of `meshtastic/firmware` on the `v4` branch.
+> This is a fork of `meshtastic/firmware` on the `selfcius/main` branch.
 > When merging upstream releases, consult the V4 Modifications section
 > to understand which conflicts are expected vs accidental.
 
@@ -14,7 +14,7 @@
 
 ## Nested Submodules
 
-- `protobufs`: `origin` = `ncwn/protobufs`, `upstream` = `meshtastic/protobufs`, branch `v4`. The firmware pins the v4 fork commit (run `git submodule status protobufs` for the exact SHA); the v4 branch carries the SELFCIUS `admin.proto` additions on top of upstream `v2.7.21-6-ge30092e`.
+- `protobufs`: `origin` = `ncwn/protobufs`, `upstream` = `meshtastic/protobufs`, branch `selfcius/main`. The firmware pins the SELFCIUS fork commit (run `git submodule status protobufs` for the exact SHA); the `selfcius/main` branch carries the SELFCIUS `admin.proto` additions on top of upstream `v2.7.21-6-ge30092e`.
 - `meshtestic`: upstream Meshtastic test fixture submodule, unchanged.
 
 ## Build
@@ -42,11 +42,11 @@
 
 ## Rules
 
-- Always merge upstream, **never rebase v4**
+- Always merge upstream, **never rebase selfcius/main**
 - Update the V4 Modifications section below when changing files
 - Do NOT modify protobufs without checking the Dependencies section
-- Feature work goes on branches off v4, merged back to v4
-- After pushing v4, update the wrapper repo submodule SHA
+- Feature work goes on branches off selfcius/main, merged back to selfcius/main
+- After pushing selfcius/main, update the wrapper repo submodule SHA
 - Treat SELFCIUS evidence as bench validation unless a gate document explicitly says field validation
 
 ## V4 Modifications
@@ -55,14 +55,17 @@
 
 ### path/to/file.cpp
 - **What:** Brief description of the change
-- **Why:** Reason this modification is needed for the v4 project
+- **Why:** Reason this modification is needed for SELFCIUS
 - **Conflict risk:** Low / Medium / High when merging upstream
 -->
 
 ### .gitmodules
-- **What:** Repointed the nested `protobufs` submodule to `ncwn/protobufs` with branch `v4`, while keeping `upstream` as `meshtastic/protobufs` in the local checkout.
-- **Why:** SELFCIUS epoch provisioning requires a deliberate protobuf fork path before changing `admin.proto`, matching the v4 fork workflow used by the other Meshtastic submodules.
+- **What:** Repointed the nested `protobufs` submodule to `ncwn/protobufs` with branch `selfcius/main`, while keeping `upstream` as `meshtastic/protobufs` in the local checkout.
+- **Why:** SELFCIUS epoch provisioning requires a deliberate protobuf fork path before changing `admin.proto`, matching the SELFCIUS fork workflow used by the other Meshtastic submodules.
 - **Conflict risk:** Medium - protobuf upstream syncs and generated-code changes must coordinate with the pinned nested submodule commit.
+- **What:** Renamed the tracked integration branch from `v4` to `selfcius/main` for handoff clarity.
+- **Why:** Future intERLab-AIT maintainers need project-specific branch names rather than the old wrapper-era `v4` label.
+- **Conflict risk:** Low - branch metadata/guidance only; the old `v4` branch remains as a temporary fallback.
 
 ### .gitignore
 - **What:** Added ignores for the SELFCIUS generated PlatformIO overlay symlinks: `/platformio_override.ini`, `/variants/selfcius/`, and `/src/selfcius/`
@@ -361,10 +364,10 @@ _None yet._
 ## Dependencies
 
 ### protobufs (nested submodule)
-- **Current status:** FORK EXECUTED. `protobufs` now tracks `ncwn/protobufs` branch `v4` (the escalation path below was triggered by the SELFCIUS officer-epoch `admin.proto` addition). `upstream` remains `meshtastic/protobufs`.
+- **Current status:** FORK EXECUTED. `protobufs` now tracks `ncwn/protobufs` branch `selfcius/main` (the escalation path below was triggered by the SELFCIUS officer-epoch `admin.proto` addition). `upstream` remains `meshtastic/protobufs`.
 - **Rationale:** Initial DTN work used existing Meshtastic payload surfaces. Proto changes require coordinated regeneration across firmware, android, and apple, so they were introduced only when the epoch-provisioning admin message needed a dedicated payload.
 - **Regeneration:** After editing `protobufs/meshtastic/*.proto`, regenerate firmware bindings with `./bin/regen-protos.sh` (needs `nanopb-0.4.9/generator-bin/protoc`; the repo's prebuilt is Linux x86 — on other hosts provide a local nanopb generator) and commit the regenerated `src/mesh/generated/...` with the schema bump.
-- **Action on upstream merge:** Merge `upstream/v4`-relevant protobuf changes into `ncwn/protobufs` v4 (never rebase); keep the SELFCIUS `admin.proto` additions; regenerate and re-pin.
+- **Action on upstream merge:** Merge relevant upstream protobuf changes into `ncwn/protobufs` `selfcius/main` (never rebase); keep the SELFCIUS `admin.proto` additions; regenerate and re-pin.
 - **Outstanding:** `upstream-versions.json` does not yet track the nested protobufs fork (it lists only the three top-level submodules); add nested tracking before relying on `scripts/upstream-sync.sh` for protobufs.
 
 ## SELFCIUS Dependency Tracking

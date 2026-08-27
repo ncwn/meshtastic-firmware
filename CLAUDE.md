@@ -149,6 +149,24 @@
 - **What:** Wrapped the three peer-SOS carry timing constants (`SELFCIUS_DTN_PEER_SOS_CARRY_MIN_INTERVAL_MS`, `SELFCIUS_DTN_PEER_SOS_CARRY_MAX_INTERVAL_MS`, and `SELFCIUS_DTN_PEER_SOS_PRESSURE_DEFER_MS`) in `#ifndef` guards, with defaults unchanged.
 - **Why:** G2 carry-forward bench needs compressed timing overrides while production keeps shipping values.
 - **Conflict risk:** Low - wrapper-owned SELFCIUS config header.
+- **What:** Added `SELFCIUS_SOS_TEXT_TRIGGER_PREFIX` ("MAYDAY MAYDAY MAYDAY") and `SELFCIUS_SOS_TEXT_CLEAR` ("SOS CLEAR") constants for phone-app SOS message detection.
+- **Why:** Enables remote SOS activation/cancellation via BLE text message from the paired phone, matching the existing 5x-button-press behavior.
+- **Conflict risk:** Low - wrapper-owned SELFCIUS config header.
+
+### src/selfcius/officer/input/selfcius_input_observer.{h,cpp}
+- **What:** Added `SosInputObserver::requestRemote(bool activate, uint32_t nowMs)` method to allow programmatic SOS activation/cancellation (e.g., from a BLE text message) with identical state/persistence logic as the button path.
+- **Why:** Provides a single SOS state machine shared by both the hardware button (5x press) and the phone-app text message path, ensuring consistent NVS persistence, audit logging, and idempotency.
+- **Conflict risk:** Low - wrapper-owned SELFCIUS overlay logic; no upstream dependencies.
+
+### src/selfcius/officer/selfcius_officer_module.{h,cpp}
+- **What:** Extracted SOS activation/cancellation side effects (audit counter, OLED alert, UI redraw, scheduler interval reset) from `handleInputEvent()` into private helpers `applySosActivated()` / `applySosCancelled()`. Added a `wantPacket()` override so the officer module additionally receives `TEXT_MESSAGE_APP` packets, an early branch in `handleReceived()` that routes chat texts to a new `handleSosTextMessage()`, which uses `classifySosText()` on the payload and toggles SOS through the SAME shared `sosInput` observer as the button path before returning `CONTINUE`.
+- **Why:** Implements remote SOS control from the paired phone: its mayday text (sent via BLE, arriving with `from == our node id`) activates SOS exactly like 5x button presses; `"SOS CLEAR"` cancels. The message itself still displays and relays normally. Messages authored by other nodes are ignored so mesh-relayed maydays never activate this node. Bench finding (2026-08-26): first attempt used a standalone `SinglePortModule` on `TEXT_MESSAGE_APP` with an inverted origin gate and its own observer — it silently missed BLE texts and could not drive OLED/cadence; folding into the officer module keeps one state machine and one persistence key.
+- **Conflict risk:** Low - wrapper-owned officer overlay; `wantPacket` override is additive behavior on SELFCIUS builds only (module absent from stock firmware).
+
+### src/selfcius/officer/input/selfcius_sos_text.{h,cpp}
+- **What:** Added pure classifier `classifySosText(payload, size)` returning `{None, Activate, Cancel}`: Activate when payload CONTAINS `SELFCIUS_SOS_TEXT_TRIGGER_PREFIX` anywhere; Cancel when trimmed payload equals `SELFCIUS_SOS_TEXT_CLEAR`.
+- **Why:** The app's emergency text starts with a UTF-8 emoji and ends with a variable timestamp, so neither prefix nor exact matching fires on the real wire format ("includes" per owner requirement). Pure bytes-in/enUM-out shape is unit-testable without MeshPacket fixtures (suite `test_sos_text`, 13 cases incl. the exact bench-observed string).
+- **Conflict risk:** Low - wrapper-owned header/cpp pair compiled only inside the SELFCIUS overlay and native tests.
 
 ### src/selfcius/common/dtn/selfcius_dtn_storage.h
 - **What:** Added a backend append-reason hook so DTN callers can distinguish storage failure modes beyond a bare `-1`
@@ -353,7 +371,8 @@
 
 <!-- Files added that don't exist in upstream -->
 
-_None yet._
+- `src/selfcius/officer/input/selfcius_sos_text.h` — remote-SOS text classifier interface
+- `src/selfcius/officer/input/selfcius_sos_text.cpp` — remote-SOS text classifier implementation
 
 ### Deleted Files
 

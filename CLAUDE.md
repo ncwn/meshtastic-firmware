@@ -77,6 +77,11 @@
 - **Why:** Provides the single firmware entry point for wrapper-owned SELFCIUS modules. Stock builds compile these lines out because `SELFCIUS_OFFICER` and `SELFCIUS_RELAY_MESH` are not defined.
 - **Conflict risk:** Low - insertion is in the existing "Put your module here" area before `RoutingModule`, which must remain last
 
+### src/mesh/PhoneAPI.cpp
+- **What:** Remap phone-originated `WAYPOINT_APP` packets to `SELFCIUS_DTN_PRIVATE_CHANNEL_INDEX` for SELFCIUS officer and relay-mesh builds.
+- **Why:** Meshtastic clients currently submit waypoints on channel 0, while SELFCIUS nodes are provisioned with the secured shared channel at index 1.
+- **Conflict risk:** Medium - upstream PhoneAPI changes may touch the same phone packet ingress path.
+
 ### src/modules/AdminModule.cpp
 - **What:** Guarded the OTA admin request path so it only uses `MeshtasticOTA` when WiFi is enabled, and returns a warning instead of rebooting on unsupported builds
 - **Why:** SELFCIUS trims WiFi for ESP32 officer/relay builds. Without this guard, `AdminModule` references OTA symbols that are not compiled in and breaks the build.

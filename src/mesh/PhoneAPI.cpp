@@ -32,6 +32,10 @@
 #include "Throttle.h"
 #include <RTC.h>
 
+#if defined(SELFCIUS_OFFICER) || defined(SELFCIUS_RELAY_MESH)
+#include "selfcius_config.h"
+#endif
+
 // Flag to indicate a heartbeat was received and we should send queue status
 bool heartbeatReceived = false;
 
@@ -784,6 +788,17 @@ bool PhoneAPI::wasSeenRecently(uint32_t id)
  */
 bool PhoneAPI::handleToRadioPacket(meshtastic_MeshPacket &p)
 {
+#if defined(SELFCIUS_OFFICER) || defined(SELFCIUS_RELAY_MESH)
+    // Meshtastic clients currently submit WAYPOINT_APP packets on channel 0.
+    // SELFCIUS uses its secured private channel for all officer-to-officer data;
+    // rewrite the phone-originated waypoint before the local echo/radio path.
+    if (p.which_payload_variant == meshtastic_MeshPacket_decoded_tag &&
+        p.decoded.portnum == meshtastic_PortNum_WAYPOINT_APP) {
+        p.channel = SELFCIUS_DTN_PRIVATE_CHANNEL_INDEX;
+        LOG_DEBUG("SELFCIUS: remapped phone waypoint to channel %u", static_cast<unsigned>(p.channel));
+    }
+#endif
+
     printPacket("PACKET FROM PHONE", &p);
 
 #if defined(ARCH_PORTDUINO)

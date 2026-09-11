@@ -372,6 +372,56 @@
 - **Why:** Phase 5 backend ACK release and bench logs must distinguish generations with reused sequence numbers.
 - **Conflict risk:** Low - standalone wrapper-owned Board B firmware.
 
+### src/selfcius/common/protocol/selfcius_dtn_packet.h
+- **What:** Added `GPS_FLAG_SOS_HEARTBEAT` (bit 2) and `GPS_FLAG_SOS_CLEAR` (bit 3), narrowed `GPS_FLAG_RESERVED_MASK` from `0xFC` to `0xF0`, and added `gpsRecordSosActive(const GpsRecord&)` — `(flags & GPS_FLAG_SOS) && !(flags & GPS_FLAG_SOS_CLEAR)`.
+- **Why:** SOS three-state protocol (start/heartbeat/clear) storage-collapse plan. Heartbeat marks a periodic stationary SOS ping as collapsible (superseded by the next heartbeat) without losing the permanent, carry-forward-eligible protection every `GPS_FLAG_SOS` record gets. Clear keeps `GPS_FLAG_SOS` set (so it stays carry-forward-eligible — peer-store carry-forward is hard-gated on the stored `sos` bit, and a `sos=false` peer record has no path back onto the mesh) but adds a distinct bit so presentation layers (WiFi transport JSON, any future dashboard consumer) can tell an active session from a resolved one. See `.claude/plans/sos-heartbeat-clear-protocol.md`.
+- **Conflict risk:** Low - wrapper-owned SELFCIUS protocol header; the flags byte and its reserved-bit gate are shared by schema-1 and V2 encode/decode, both already updated.
+
+### src/selfcius/common/selfcius_config.h
+- **What:** Added `SELFCIUS_SOS_MOVEMENT_THRESHOLD_M = 20.0`.
+- **Why:** Threshold distance (meters) between the current fix and the last-sent SOS record above which a new SOS cycle is classified as a movement milestone instead of a collapsible heartbeat. 20 m is a deliberately generous margin for non-RTK GPS under forest canopy (no bench-measured jitter figure exists in this repo yet — revisit once one does).
+- **Conflict risk:** Low - wrapper-owned SELFCIUS config header.
+
+### src/selfcius/officer/gps/selfcius_gps_sampler.{h,cpp}
+- **What:** Added `isSosMovement(hasLastSentSosPosition, lastLat, lastLon, newLat, newLon, thresholdMeters)` (pure equirectangular-approximation distance-threshold classifier) and threaded a caller-tracked `hasLastSentSosPosition`/`lastSentSosLatitudeI`/`lastSentSosLongitudeI` baseline through `GpsSampleInput`, `buildGpsSampleInput()`, and `GpsSampler::sampleMeshtastic()`. `sample()`'s valid-fix SOS path now sets `GPS_FLAG_SOS_HEARTBEAT` alongside `GPS_FLAG_SOS` when the new fix is within the threshold of the baseline; no baseline (`hasLastSentSosPosition=false` — session start or a reboot that lost the RAM baseline) always classifies as movement.
+- **Why:** Implements the heartbeat/movement classification for the SOS storage-collapse plan. The no-lock and stale-fix SOS branches deliberately stay plain-milestone (never heartbeat) — a degraded fix during SOS is itself noteworthy, not safe to silently collapse.
+- **Conflict risk:** Low - wrapper-owned officer GPS capture path with native coverage (`test_officer_pipeline`).
+
+### src/selfcius/officer/selfcius_officer_module.{h,cpp}
+- **What:** Added `hasLastSentSosPosition`/`lastSentSosLatitudeI`/`lastSentSosLongitudeI` (heartbeat/movement baseline, reset in both `applySosActivated()` and `applySosCancelled()`) and `pendingSosClear` (set in `applySosCancelled()`, consumed at the top of `runOnce()`). New `sendImmediateSosClear(localNodeId, nowMs)` samples a fresh position, forces `flags = GPS_FLAG_SOS | GPS_FLAG_SOS_CLEAR` (stripping any heartbeat bit the sampler's classifier picked), stores it, and sends it on the mesh immediately — out of band from the normal GPS-cycle schedule — instead of waiting for the next scheduled tick. The normal GPS cycle now passes the baseline into `sampleMeshtastic()` and updates it after a real-fix (`GPS_FLAG_VALID_FIX`) SOS send.
+- **Why:** Fixes the "SOS clear only stops locally, other nodes/backend stay stale up to one GPS-cycle interval" bug, and supplies the per-officer state needed for heartbeat/movement classification. See `.claude/plans/sos-heartbeat-clear-protocol.md` Design §3.
+- **Conflict risk:** Low - wrapper-owned officer overlay; additive state and one new private method, no change to existing button/BLE activation call sites beyond the new baseline reset.
+
+### src/selfcius/common/dtn/selfcius_dtn_store.h, src/selfcius/common/dtn/selfcius_dtn_store.cpp
+- **What:** Added `bool heartbeat` to `DtnIndexEntry` and a new private `supersedeHeartbeat(peerRecord, originNodeId, originEpoch)` that purges an existing heartbeat-flagged record for the same session (regardless of `Captured`/`MeshQueued` status) before a new heartbeat is admitted, for both the own and peer store paths in `storeRecord()`. A milestone (`sos && !heartbeat`) never triggers or is targeted by this.
+- **Why:** Without this, a stationary SOS session's own store fills in ~3.2 h and peer store in ~1.6 h at the 1/min SOS cadence (every heartbeat kept forever, same as a milestone). Superseding also drops the old heartbeat's carry-forward metadata (`removeCarryMeta`) so a stale heartbeat never keeps consuming carry-forward budget after a fresher one exists.
+- **Conflict risk:** Low - wrapper-owned DTN store logic; `DtnIndexEntry`'s `<= 32 byte` static assert re-verified (compiles; well under the cap).
+
+### src/selfcius/common/dtn/selfcius_relay_dtn_store.h, src/selfcius/common/dtn/selfcius_relay_dtn_store.cpp
+- **What:** Added a new private `supersedeHeartbeat(originNodeId, originEpoch)`, called from `storeObserved()` before the cap checks when the incoming record is heartbeat-flagged. Deliberately does **not** add a RAM field to `RelayDtnIndexEntry` (already exactly at its documented 24-byte budget, `static_assert` in the header) — reads the heartbeat bit back from storage for each same-origin+epoch SOS candidate instead. Purges regardless of delivery status (`Captured`/`UartForwarded`/`BoardBStored`) — unlike the existing GPS/SOS cap-pressure eviction functions in this file, which deliberately protect in-flight records (audit F50); heartbeats are disposable by design so that protection doesn't apply here.
+- **Why:** Same storage-growth problem as the own/peer officer store, at the relay layer (relay's dedicated SOS pool is a 96-record cap, `selfcius_config.h:105`).
+- **Conflict risk:** Low - wrapper-owned relay DTN store logic.
+
+### src/selfcius/relay_lorawan/board_b_store.h
+- **What:** Added `bool heartbeat` to `BoardBIndexEntry` (appended last, following the existing `everUplinked` no-default-initializer/aggregate-omission idiom so unaffected fresh-store call sites don't need to change).
+- **Why:** Lets `findLatestGpsForGeneration()`/`latestSeqForGeneration()` widen their freshness-collapse eligibility to heartbeat-flagged SOS records.
+- **Conflict risk:** Low - wrapper-owned Board B record store API.
+
+### src/selfcius/relay_lorawan/board_b_store.cpp
+- **What:** Widened `findLatestGpsForGeneration()`'s and `latestSeqForGeneration()`'s exclusion from `sos` to `sos && !heartbeat`, and `storeFromUart()`'s/`rebuildIndex()`'s `if (!sos)` collapse-attempt gate to `if (!sos || heartbeat)`. A milestone (`sos && !heartbeat`) still never enters either eligibility scan or the collapse block — unchanged from before. The `Received`-only in-flight protection (the fix for audit F50: never collapse an `UplinkPending`/`Uplinked` record) is explicitly preserved unchanged for heartbeats too.
+- **Why:** Unlike the own/peer officer store and the relay store, Board B already had a generic same-generation freshness-collapse mechanism for plain GPS; this widens its eligibility to also cover heartbeat-flagged SOS instead of adding a new mechanism.
+- **Conflict risk:** Low - wrapper-owned Board B record store implementation; touches the exact code path implicated in the historical audit F50 in-flight-custody bug, so the Received-only restriction was deliberately left untouched rather than relaxed.
+
+### src/selfcius/relay_lorawan/transport/wifi_transport.cpp
+- **What:** The per-record `"sos"` JSON field sent to the backend now uses `gpsRecordSosActive(record)` instead of a raw `record.flags & GPS_FLAG_SOS` test.
+- **Why:** A CLEAR record keeps `GPS_FLAG_SOS` set (for DTN storage/carry-forward protection — see the `selfcius_dtn_packet.h` entry above), so the raw bit test would have reported `sos=true` for a resolved SOS session and the backend dashboard would never see the resolution. Found during implementation of the SOS storage-collapse plan; this is the one place a "backend impact: none" claim in that plan turned out to need a firmware-side fix (not a backend/Python change) to hold true.
+- **Conflict risk:** Low - wrapper-owned Board B WiFi transport; this is the active production Board B leg (`selfcius-relay-wifi-v4`), not the dormant LoRaWAN path.
+
+### src/selfcius/relay_lorawan/src/main.cpp
+- **What:** The batch-level `sosPresent` flag (`selfcius::gpsRecordSosActive(selected[i])` instead of a raw `GPS_FLAG_SOS` test) when building the WiFi uplink batch.
+- **Why:** Must match `wifi_transport.cpp`'s per-record `"sos"` derivation above — `server.py` cross-checks `sosPresent` against `any(rec.sos for rec in records)` and rejects the whole batch on mismatch; a CLEAR-only batch would otherwise report `sosPresent=true` while every record in it now (correctly) reports `sos=false`.
+- **Conflict risk:** Low - standalone wrapper-owned Board B firmware.
+
 ### New Files
 
 <!-- Files added that don't exist in upstream -->
